@@ -16,7 +16,7 @@ jobs:
       - name: Pack cc-runtime
         run: |
           set -e
-          cat assembly.h int_endianness.h int_types.h int_lib.h int_util.h $(find . -name *.c | LC_ALL=C sort) > /tmp/cc-runtime.c
+          cat assembly.h int_endianness.h int_types.h int_lib.h int_util.h $(find . -name '*.c' | LC_ALL=C sort) > /tmp/cc-runtime.c
           grep '#include <' /tmp/cc-runtime.c > /tmp/saved-includes
           sed -i '/#include/d' /tmp/cc-runtime.c
           cat /tmp/saved-includes /tmp/cc-runtime.c > /tmp/cc-runtime.c.tmp
