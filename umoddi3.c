@@ -16,7 +16,9 @@
 
 // Returns: a % b
 
+#ifdef clz
 #undef clz
+#endif
 #define clz(a) (sizeof(a) == sizeof(unsigned long long) ? __builtin_clzll(a) : clzsi(a))
 
 // Mostly identical to __udivdi3 but the return values are different.
@@ -46,3 +48,5 @@ COMPILER_RT_ABI du_int __umoddi3(du_int n, du_int d) {
   }
   return r;
 }
+
+#undef clz

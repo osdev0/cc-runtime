@@ -16,7 +16,9 @@
 
 // Returns: a / b
 
+#ifdef clz
 #undef clz
+#endif
 #define clz(a) (sizeof(a) == sizeof(unsigned long long) ? __builtin_clzll(a) : clzsi(a))
 
 // Adapted from Figure 3-40 of The PowerPC Compiler Writer's Guide
@@ -47,6 +49,8 @@ COMPILER_RT_ABI su_int __udivsi3(su_int n, su_int d) {
   n = (n << 1) | carry;
   return n;
 }
+
+#undef clz
 
 #if defined(__ARM_EABI__)
 COMPILER_RT_ALIAS(__udivsi3, __aeabi_uidiv)
