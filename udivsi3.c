@@ -21,7 +21,7 @@
 COMPILER_RT_ABI su_int __udivsi3(su_int n, su_int d) {
   const unsigned N = sizeof(su_int) * CHAR_BIT;
   // d == 0 cases are unspecified.
-  unsigned sr = (d ? (unsigned)clz(d) : N) - (n ? (unsigned)clz(n) : N);
+  unsigned sr = (d ? clz(d) : N) - (n ? clz(n) : N);
   // 0 <= sr <= N - 1 or sr is very large.
   if (sr > N - 1) // n < d
     return 0;
