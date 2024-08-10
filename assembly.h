@@ -166,7 +166,9 @@
 #define GLUE4_(a, b, c, d) a##b##c##d
 #define GLUE4(a, b, c, d) GLUE4_(a, b, c, d)
 
+#ifndef SYMBOL_NAME
 #define SYMBOL_NAME(name) GLUE(__USER_LABEL_PREFIX__, name)
+#endif
 
 #ifdef VISIBILITY_HIDDEN
 #define DECLARE_SYMBOL_VISIBILITY(name)                                        \

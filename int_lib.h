@@ -39,9 +39,11 @@
 #define NORETURN __attribute__((noreturn))
 #define UNUSED __attribute__((unused))
 
+#ifndef SYMBOL_NAME
 #define STR(a) #a
 #define XSTR(a) STR(a)
 #define SYMBOL_NAME(name) XSTR(__USER_LABEL_PREFIX__) #name
+#endif
 
 #define COMPILER_RT_ALIAS(name, aliasname) \
   COMPILER_RT_ABI __typeof(name) aliasname __attribute__((__alias__(#name)));
