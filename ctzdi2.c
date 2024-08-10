@@ -33,3 +33,7 @@ COMPILER_RT_ABI int __ctzdi2(di_int a) {
   return ctzsi((x.s.high & f) | (x.s.low & ~f)) +
          (f & ((si_int)(sizeof(si_int) * CHAR_BIT)));
 }
+
+#ifdef __builtin_ctz
+#undef __builtin_ctz
+#endif

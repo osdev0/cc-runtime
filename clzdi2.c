@@ -33,3 +33,7 @@ COMPILER_RT_ABI int __clzdi2(di_int a) {
   return clzsi((x.s.high & ~f) | (x.s.low & f)) +
          (f & ((si_int)(sizeof(si_int) * CHAR_BIT)));
 }
+
+#ifdef __builtin_clz
+#undef __builtin_clz
+#endif
