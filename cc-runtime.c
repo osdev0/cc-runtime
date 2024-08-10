@@ -883,6 +883,9 @@ COMPILER_RT_ABI uint32_t __bswapsi2(uint32_t u) {
 // On 64-bit architectures with neither a native clz instruction nor a native
 // ctz instruction, gcc resolves __builtin_clz to __clzdi2 rather than
 // __clzsi2, leading to infinite recursion.
+#ifdef __builtin_clz
+#undef __builtin_clz
+#endif
 #define __builtin_clz(a) __clzsi2(a)
 extern int __clzsi2(si_int);
 #endif
@@ -1075,6 +1078,9 @@ COMPILER_RT_ABI si_int __cmpti2(ti_int a, ti_int b) {
 // On 64-bit architectures with neither a native clz instruction nor a native
 // ctz instruction, gcc resolves __builtin_ctz to __ctzdi2 rather than
 // __ctzsi2, leading to infinite recursion.
+#ifdef __builtin_ctz
+#undef __builtin_ctz
+#endif
 #define __builtin_ctz(a) __ctzsi2(a)
 extern int __ctzsi2(si_int);
 #endif
@@ -2488,7 +2494,9 @@ COMPILER_RT_ABI si_int __ucmpti2(tu_int a, tu_int b) {
 
 // Returns: a / b
 
+#ifdef
 #undef clz
+#endif
 #define clz(a) (sizeof(a) == sizeof(unsigned long long) ? __builtin_clzll(a) : clzsi(a))
 
 // Adapted from Figure 3-40 of The PowerPC Compiler Writer's Guide
@@ -2519,6 +2527,8 @@ COMPILER_RT_ABI du_int __udivdi3(du_int n, du_int d) {
   n = (n << 1) | carry;
   return n;
 }
+
+#undef clz
 //===-- udivmoddi4.c - Implement __udivmoddi4 -----------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -2903,7 +2913,9 @@ COMPILER_RT_ABI tu_int __udivmodti4(tu_int a, tu_int b, tu_int *rem) {
 
 // Returns: a / b
 
+#ifdef
 #undef clz
+#endif
 #define clz(a) (sizeof(a) == sizeof(unsigned long long) ? __builtin_clzll(a) : clzsi(a))
 
 // Adapted from Figure 3-40 of The PowerPC Compiler Writer's Guide
@@ -2934,6 +2946,8 @@ COMPILER_RT_ABI su_int __udivsi3(su_int n, su_int d) {
   n = (n << 1) | carry;
   return n;
 }
+
+#undef clz
 
 #if defined(__ARM_EABI__)
 COMPILER_RT_ALIAS(__udivsi3, __aeabi_uidiv)
@@ -2977,7 +2991,9 @@ COMPILER_RT_ABI tu_int __udivti3(tu_int a, tu_int b) {
 
 // Returns: a % b
 
+#ifdef clz
 #undef clz
+#endif
 #define clz(a) (sizeof(a) == sizeof(unsigned long long) ? __builtin_clzll(a) : clzsi(a))
 
 // Mostly identical to __udivdi3 but the return values are different.
@@ -3007,6 +3023,8 @@ COMPILER_RT_ABI du_int __umoddi3(du_int n, du_int d) {
   }
   return r;
 }
+
+#undef clz
 //===-- umodsi3.c - Implement __umodsi3 -----------------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -3024,7 +3042,9 @@ COMPILER_RT_ABI du_int __umoddi3(du_int n, du_int d) {
 
 // Returns: a % b
 
+#ifdef clz
 #undef clz
+#endif
 #define clz(a) (sizeof(a) == sizeof(unsigned long long) ? __builtin_clzll(a) : clzsi(a))
 
 // Mostly identical to __udivsi3 but the return values are different.
@@ -3054,6 +3074,8 @@ COMPILER_RT_ABI su_int __umodsi3(su_int n, su_int d) {
   }
   return r;
 }
+
+#undef clz
 //===-- umodti3.c - Implement __umodti3 -----------------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
