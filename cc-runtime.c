@@ -2494,7 +2494,7 @@ COMPILER_RT_ABI si_int __ucmpti2(tu_int a, tu_int b) {
 
 // Returns: a / b
 
-#ifdef
+#ifdef clz
 #undef clz
 #endif
 #define clz(a) (sizeof(a) == sizeof(unsigned long long) ? __builtin_clzll(a) : clzsi(a))
@@ -2913,7 +2913,7 @@ COMPILER_RT_ABI tu_int __udivmodti4(tu_int a, tu_int b, tu_int *rem) {
 
 // Returns: a / b
 
-#ifdef
+#ifdef clz
 #undef clz
 #endif
 #define clz(a) (sizeof(a) == sizeof(unsigned long long) ? __builtin_clzll(a) : clzsi(a))
