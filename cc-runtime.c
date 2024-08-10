@@ -894,6 +894,10 @@ COMPILER_RT_ABI int __clzdi2(di_int a) {
   return clzsi((x.s.high & ~f) | (x.s.low & f)) +
          (f & ((si_int)(sizeof(si_int) * CHAR_BIT)));
 }
+
+#ifdef __builtin_clz
+#undef __builtin_clz
+#endif
 //===-- clzsi2.c - Implement __clzsi2 -------------------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -1080,6 +1084,10 @@ COMPILER_RT_ABI int __ctzdi2(di_int a) {
   return ctzsi((x.s.high & f) | (x.s.low & ~f)) +
          (f & ((si_int)(sizeof(si_int) * CHAR_BIT)));
 }
+
+#ifdef __builtin_ctz
+#undef __builtin_ctz
+#endif
 //===-- ctzsi2.c - Implement __ctzsi2 -------------------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
