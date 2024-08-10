@@ -2459,7 +2459,7 @@ COMPILER_RT_ABI si_int __ucmpti2(tu_int a, tu_int b) {
 COMPILER_RT_ABI du_int __udivdi3(du_int n, du_int d) {
   const unsigned N = sizeof(du_int) * CHAR_BIT;
   // d == 0 cases are unspecified.
-  unsigned sr = (d ? clz(d) : N) - (n ? clz(n) : N);
+  unsigned sr = (d ? (unsigned)clz(d) : N) - (n ? (unsigned)clz(n) : N);
   // 0 <= sr <= N - 1 or sr is very large.
   if (sr > N - 1) // n < d
     return 0;
@@ -2872,7 +2872,7 @@ COMPILER_RT_ABI tu_int __udivmodti4(tu_int a, tu_int b, tu_int *rem) {
 COMPILER_RT_ABI su_int __udivsi3(su_int n, su_int d) {
   const unsigned N = sizeof(su_int) * CHAR_BIT;
   // d == 0 cases are unspecified.
-  unsigned sr = (d ? clz(d) : N) - (n ? clz(n) : N);
+  unsigned sr = (d ? (unsigned)clz(d) : N) - (n ? (unsigned)clz(n) : N);
   // 0 <= sr <= N - 1 or sr is very large.
   if (sr > N - 1) // n < d
     return 0;
@@ -2944,7 +2944,7 @@ COMPILER_RT_ABI tu_int __udivti3(tu_int a, tu_int b) {
 COMPILER_RT_ABI du_int __umoddi3(du_int n, du_int d) {
   const unsigned N = sizeof(du_int) * CHAR_BIT;
   // d == 0 cases are unspecified.
-  unsigned sr = (d ? clz(d) : N) - (n ? clz(n) : N);
+  unsigned sr = (d ? (unsigned)clz(d) : N) - (n ? (unsigned)clz(n) : N);
   // 0 <= sr <= N - 1 or sr is very large.
   if (sr > N - 1) // n < d
     return n;
@@ -2989,7 +2989,7 @@ COMPILER_RT_ABI du_int __umoddi3(du_int n, du_int d) {
 COMPILER_RT_ABI su_int __umodsi3(su_int n, su_int d) {
   const unsigned N = sizeof(su_int) * CHAR_BIT;
   // d == 0 cases are unspecified.
-  unsigned sr = (d ? clz(d) : N) - (n ? clz(n) : N);
+  unsigned sr = (d ? (unsigned)clz(d) : N) - (n ? (unsigned)clz(n) : N);
   // 0 <= sr <= N - 1 or sr is very large.
   if (sr > N - 1) // n < d
     return n;
