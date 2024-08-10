@@ -16,11 +16,14 @@
 
 // Returns: a / b
 
-#define fixint_t ti_int
-#define fixuint_t tu_int
-#define COMPUTE_UDIV(a, b) __udivmodti4((a), (b), (tu_int *)0)
-#include "int_div_impl.inc"
-
-COMPILER_RT_ABI ti_int __divti3(ti_int a, ti_int b) { return __divXi3(a, b); }
+COMPILER_RT_ABI ti_int __divti3(ti_int a, ti_int b) {
+  const int N = (int)(sizeof(ti_int) * CHAR_BIT) - 1;
+  ti_int s_a = a >> N;                            // s_a = a < 0 ? -1 : 0
+  ti_int s_b = b >> N;                            // s_b = b < 0 ? -1 : 0
+  tu_int a_u = (tu_int)(a ^ s_a) + (-s_a);    // negate if s_a == -1
+  tu_int b_u = (tu_int)(b ^ s_b) + (-s_b);    // negate if s_b == -1
+  s_a ^= s_b;                                       // sign of quotient
+  return (__udivmodti4(a_u, b_u, (tu_int *)0) ^ s_a) + (-s_a);   // negate if s_a == -1
+}
 
 #endif // CRT_HAS_128BIT

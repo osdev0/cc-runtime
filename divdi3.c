@@ -14,9 +14,12 @@
 
 // Returns: a / b
 
-#define fixint_t di_int
-#define fixuint_t du_int
-#define COMPUTE_UDIV(a, b) __udivmoddi4((a), (b), (du_int *)0)
-#include "int_div_impl.inc"
-
-COMPILER_RT_ABI di_int __divdi3(di_int a, di_int b) { return __divXi3(a, b); }
+COMPILER_RT_ABI di_int __divdi3(di_int a, di_int b) {
+  const int N = (int)(sizeof(di_int) * CHAR_BIT) - 1;
+  di_int s_a = a >> N;                            // s_a = a < 0 ? -1 : 0
+  di_int s_b = b >> N;                            // s_b = b < 0 ? -1 : 0
+  du_int a_u = (du_int)(a ^ s_a) + (-s_a);    // negate if s_a == -1
+  du_int b_u = (du_int)(b ^ s_b) + (-s_b);    // negate if s_b == -1
+  s_a ^= s_b;                                       // sign of quotient
+  return (__udivmoddi4(a_u, b_u, (du_int *)0) ^ s_a) + (-s_a);   // negate if s_a == -1
+}

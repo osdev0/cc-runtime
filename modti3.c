@@ -16,11 +16,15 @@
 
 // Returns: a % b
 
-#define fixint_t ti_int
-#define fixuint_t tu_int
-#define ASSIGN_UMOD(res, a, b) __udivmodti4((a), (b), &(res))
-#include "int_div_impl.inc"
-
-COMPILER_RT_ABI ti_int __modti3(ti_int a, ti_int b) { return __modXi3(a, b); }
+COMPILER_RT_ABI ti_int __modti3(ti_int a, ti_int b) {
+  const int N = (int)(sizeof(ti_int) * CHAR_BIT) - 1;
+  ti_int s = b >> N;                              // s = b < 0 ? -1 : 0
+  tu_int b_u = (tu_int)(b ^ s) + (-s);        // negate if s == -1
+  s = a >> N;                                       // s = a < 0 ? -1 : 0
+  tu_int a_u = (tu_int)(a ^ s) + (-s);        // negate if s == -1
+  tu_int res;
+  __udivmodti4(a_u, b_u, &res);
+  return (res ^ s) + (-s);                          // negate if s == -1
+}
 
 #endif // CRT_HAS_128BIT

@@ -14,16 +14,20 @@
 
 // Returns: a / b
 
-#define fixint_t si_int
-#define fixuint_t su_int
 // On CPUs without unsigned hardware division support,
 //  this calls __udivsi3 (notice the cast to su_int).
 // On CPUs with unsigned hardware division support,
 //  this uses the unsigned division instruction.
-#define COMPUTE_UDIV(a, b) ((su_int)(a) / (su_int)(b))
-#include "int_div_impl.inc"
 
-COMPILER_RT_ABI si_int __divsi3(si_int a, si_int b) { return __divXi3(a, b); }
+COMPILER_RT_ABI si_int __divsi3(si_int a, si_int b) {
+  const int N = (int)(sizeof(si_int) * CHAR_BIT) - 1;
+  si_int s_a = a >> N;                            // s_a = a < 0 ? -1 : 0
+  si_int s_b = b >> N;                            // s_b = b < 0 ? -1 : 0
+  su_int a_u = (su_int)(a ^ s_a) + (-s_a);    // negate if s_a == -1
+  su_int b_u = (su_int)(b ^ s_b) + (-s_b);    // negate if s_b == -1
+  s_a ^= s_b;                                       // sign of quotient
+  return (((su_int)a_u / (su_int)b_u) ^ s_a) + (-s_a);   // negate if s_a == -1
+}
 
 #if defined(__ARM_EABI__)
 COMPILER_RT_ALIAS(__divsi3, __aeabi_idiv)
