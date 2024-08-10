@@ -53,7 +53,7 @@
 #define BTI_FLAG 0
 #endif
 
-#if __ARM_FEATURE_PAC_DEFAULT & 3
+#if defined(__ARM_FEATURE_PAC_DEFAULT) && __ARM_FEATURE_PAC_DEFAULT & 3
 #define PAC_FLAG GNU_PROPERTY_AARCH64_FEATURE_1_PAC
 #else
 #define PAC_FLAG 0
@@ -405,7 +405,7 @@ typedef union {
 
 // ABI macro definitions
 
-#if __ARM_EABI__
+#if defined(__ARM_EABI) && __ARM_EABI__
 #ifdef COMPILER_RT_ARMHF_TARGET
 #define COMPILER_RT_ABI
 #else
@@ -593,7 +593,7 @@ COMPILER_RT_ABI ti_int __absvti2(ti_int a) {
 // Effects: aborts if a + b overflows
 
 COMPILER_RT_ABI di_int __addvdi3(di_int a, di_int b) {
-  di_int s = (du_int)a + (du_int)b;
+  di_int s = (di_int)((du_int)a + (du_int)b);
   if (b >= 0) {
     if (s < a)
       compilerrt_abort();
@@ -621,7 +621,7 @@ COMPILER_RT_ABI di_int __addvdi3(di_int a, di_int b) {
 // Effects: aborts if a + b overflows
 
 COMPILER_RT_ABI si_int __addvsi3(si_int a, si_int b) {
-  si_int s = (su_int)a + (su_int)b;
+  si_int s = (si_int)((su_int)a + (su_int)b);
   if (b >= 0) {
     if (s < a)
       compilerrt_abort();
@@ -651,7 +651,7 @@ COMPILER_RT_ABI si_int __addvsi3(si_int a, si_int b) {
 // Effects: aborts if a + b overflows
 
 COMPILER_RT_ABI ti_int __addvti3(ti_int a, ti_int b) {
-  ti_int s = (tu_int)a + (tu_int)b;
+  ti_int s = (ti_int)((tu_int)a + (tu_int)b);
   if (b >= 0) {
     if (s < a)
       compilerrt_abort();
@@ -687,13 +687,13 @@ COMPILER_RT_ABI di_int __ashldi3(di_int a, int b) {
   input.all = a;
   if (b & bits_in_word) /* bits_in_word <= b < bits_in_dword */ {
     result.s.low = 0;
-    result.s.high = input.s.low << (b - bits_in_word);
+    result.s.high = (si_int)(input.s.low << (b - bits_in_word));
   } else /* 0 <= b < bits_in_word */ {
     if (b == 0)
       return a;
     result.s.low = input.s.low << b;
     result.s.high =
-        ((su_int)input.s.high << b) | (input.s.low >> (bits_in_word - b));
+        (si_int)(((su_int)input.s.high << b) | (input.s.low >> (bits_in_word - b)));
   }
   return result.all;
 }
@@ -727,13 +727,13 @@ COMPILER_RT_ABI ti_int __ashlti3(ti_int a, int b) {
   input.all = a;
   if (b & bits_in_dword) /* bits_in_dword <= b < bits_in_tword */ {
     result.s.low = 0;
-    result.s.high = input.s.low << (b - bits_in_dword);
+    result.s.high = (di_int)(input.s.low << (b - bits_in_dword));
   } else /* 0 <= b < bits_in_dword */ {
     if (b == 0)
       return a;
     result.s.low = input.s.low << b;
     result.s.high =
-        ((du_int)input.s.high << b) | (input.s.low >> (bits_in_dword - b));
+        (di_int)(((du_int)input.s.high << b) | (input.s.low >> (bits_in_dword - b)));
   }
   return result.all;
 }
@@ -764,7 +764,7 @@ COMPILER_RT_ABI di_int __ashrdi3(di_int a, int b) {
   if (b & bits_in_word) /* bits_in_word <= b < bits_in_dword */ {
     // result.s.high = input.s.high < 0 ? -1 : 0
     result.s.high = input.s.high >> (bits_in_word - 1);
-    result.s.low = input.s.high >> (b - bits_in_word);
+    result.s.low = (su_int)(input.s.high >> (b - bits_in_word));
   } else /* 0 <= b < bits_in_word */ {
     if (b == 0)
       return a;
@@ -805,7 +805,7 @@ COMPILER_RT_ABI ti_int __ashrti3(ti_int a, int b) {
   if (b & bits_in_dword) /* bits_in_dword <= b < bits_in_tword */ {
     // result.s.high = input.s.high < 0 ? -1 : 0
     result.s.high = input.s.high >> (bits_in_dword - 1);
-    result.s.low = input.s.high >> (b - bits_in_dword);
+    result.s.low = (du_int)(input.s.high >> (b - bits_in_dword));
   } else /* 0 <= b < bits_in_dword */ {
     if (b == 0)
       return a;
@@ -896,7 +896,7 @@ COMPILER_RT_ABI int __clzdi2(di_int a) {
   dwords x;
   x.all = a;
   const si_int f = -(x.s.high == 0);
-  return clzsi((x.s.high & ~f) | (x.s.low & f)) +
+  return clzsi((su_int)(x.s.high & ~f) | (x.s.low & (su_int)f)) +
          (f & ((si_int)(sizeof(si_int) * CHAR_BIT)));
 }
 
@@ -924,19 +924,19 @@ COMPILER_RT_ABI int __clzsi2(si_int a) {
   su_int x = (su_int)a;
   si_int t = ((x & 0xFFFF0000) == 0) << 4; // if (x is small) t = 16 else 0
   x >>= 16 - t;                            // x = [0 - 0xFFFF]
-  su_int r = t;                            // r = [0, 16]
+  su_int r = (su_int)t;                            // r = [0, 16]
   // return r + clz(x)
   t = ((x & 0xFF00) == 0) << 3;
   x >>= 8 - t; // x = [0 - 0xFF]
-  r += t;      // r = [0, 8, 16, 24]
+  r += (su_int)t;      // r = [0, 8, 16, 24]
   // return r + clz(x)
   t = ((x & 0xF0) == 0) << 2;
   x >>= 4 - t; // x = [0 - 0xF]
-  r += t;      // r = [0, 4, 8, 12, 16, 20, 24, 28]
+  r += (su_int)t;      // r = [0, 4, 8, 12, 16, 20, 24, 28]
   // return r + clz(x)
   t = ((x & 0xC) == 0) << 1;
   x >>= 2 - t; // x = [0 - 3]
-  r += t;      // r = [0 - 30] and is even
+  r += (su_int)t;      // r = [0 - 30] and is even
   // return r + clz(x)
   //     switch (x)
   //     {
@@ -948,7 +948,7 @@ COMPILER_RT_ABI int __clzsi2(si_int a) {
   //     case 3:
   //         return r;
   //     }
-  return r + ((2 - x) & -((x & 2) == 0));
+  return (si_int)(r + ((2 - x) & -((x & 2) == 0)));
 }
 //===-- clzti2.c - Implement __clzti2 -------------------------------------===//
 //
@@ -973,7 +973,7 @@ COMPILER_RT_ABI int __clzti2(ti_int a) {
   twords x;
   x.all = a;
   const di_int f = -(x.s.high == 0);
-  return __builtin_clzll((x.s.high & ~f) | (x.s.low & f)) +
+  return __builtin_clzll((du_int)(x.s.high & ~f) | (x.s.low & (du_int)f)) +
          ((si_int)f & ((si_int)(sizeof(di_int) * CHAR_BIT)));
 }
 
@@ -1091,7 +1091,7 @@ COMPILER_RT_ABI int __ctzdi2(di_int a) {
   dwords x;
   x.all = a;
   const si_int f = -(x.s.low == 0);
-  return ctzsi((x.s.high & f) | (x.s.low & ~f)) +
+  return ctzsi((su_int)(x.s.high & f) | (x.s.low & (su_int)~f)) +
          (f & ((si_int)(sizeof(si_int) * CHAR_BIT)));
 }
 
@@ -1120,20 +1120,20 @@ COMPILER_RT_ABI int __ctzsi2(si_int a) {
   si_int t = ((x & 0x0000FFFF) == 0)
              << 4; // if (x has no small bits) t = 16 else 0
   x >>= t;         // x = [0 - 0xFFFF] + higher garbage bits
-  su_int r = t;    // r = [0, 16]
+  su_int r = (su_int)t;    // r = [0, 16]
   // return r + ctz(x)
   t = ((x & 0x00FF) == 0) << 3;
   x >>= t; // x = [0 - 0xFF] + higher garbage bits
-  r += t;  // r = [0, 8, 16, 24]
+  r += (su_int)t;  // r = [0, 8, 16, 24]
   // return r + ctz(x)
   t = ((x & 0x0F) == 0) << 2;
   x >>= t; // x = [0 - 0xF] + higher garbage bits
-  r += t;  // r = [0, 4, 8, 12, 16, 20, 24, 28]
+  r += (su_int)t;  // r = [0, 4, 8, 12, 16, 20, 24, 28]
   // return r + ctz(x)
   t = ((x & 0x3) == 0) << 1;
   x >>= t;
   x &= 3; // x = [0 - 3]
-  r += t; // r = [0 - 30] and is even
+  r += (su_int)t; // r = [0 - 30] and is even
   // return r + ctz(x)
 
   //  The branch-less return statement below is equivalent
@@ -1148,7 +1148,7 @@ COMPILER_RT_ABI int __ctzsi2(si_int a) {
   //     case 3:
   //         return r;
   //     }
-  return r + ((2 - (x >> 1)) & -((x & 1) == 0));
+  return (int)(r + ((2 - (x >> 1)) & -((x & 1) == 0)));
 }
 //===-- ctzti2.c - Implement __ctzti2 -------------------------------------===//
 //
@@ -1173,7 +1173,7 @@ COMPILER_RT_ABI int __ctzti2(ti_int a) {
   twords x;
   x.all = a;
   const di_int f = -(x.s.low == 0);
-  return __builtin_ctzll((x.s.high & f) | (x.s.low & ~f)) +
+  return __builtin_ctzll((du_int)(x.s.high & f) | (x.s.low & (du_int)~f)) +
          ((si_int)f & ((si_int)(sizeof(di_int) * CHAR_BIT)));
 }
 
@@ -1199,10 +1199,10 @@ COMPILER_RT_ABI di_int __divdi3(di_int a, di_int b) {
   const int N = (int)(sizeof(di_int) * CHAR_BIT) - 1;
   di_int s_a = a >> N;                            // s_a = a < 0 ? -1 : 0
   di_int s_b = b >> N;                            // s_b = b < 0 ? -1 : 0
-  du_int a_u = (du_int)(a ^ s_a) + (-s_a);    // negate if s_a == -1
-  du_int b_u = (du_int)(b ^ s_b) + (-s_b);    // negate if s_b == -1
+  du_int a_u = (du_int)(a ^ s_a) + (du_int)(-s_a);    // negate if s_a == -1
+  du_int b_u = (du_int)(b ^ s_b) + (du_int)(-s_b);    // negate if s_b == -1
   s_a ^= s_b;                                       // sign of quotient
-  return (__udivmoddi4(a_u, b_u, (du_int *)0) ^ s_a) + (-s_a);   // negate if s_a == -1
+  return (int)(__udivmoddi4(a_u, b_u, (du_int *)0) ^ (du_int)s_a) + (-s_a);   // negate if s_a == -1
 }
 //===-- divmoddi4.c - Implement __divmoddi4 -------------------------------===//
 //
@@ -1223,12 +1223,12 @@ COMPILER_RT_ABI di_int __divmoddi4(di_int a, di_int b, di_int *rem) {
   const int bits_in_dword_m1 = (int)(sizeof(di_int) * CHAR_BIT) - 1;
   di_int s_a = a >> bits_in_dword_m1;                   // s_a = a < 0 ? -1 : 0
   di_int s_b = b >> bits_in_dword_m1;                   // s_b = b < 0 ? -1 : 0
-  a = (du_int)(a ^ s_a) - s_a;                          // negate if s_a == -1
-  b = (du_int)(b ^ s_b) - s_b;                          // negate if s_b == -1
+  a = (di_int)((du_int)(a ^ s_a) - (du_int)s_a);        // negate if s_a == -1
+  b = (di_int)((du_int)(b ^ s_b) - (du_int)s_b);        // negate if s_b == -1
   s_b ^= s_a;                                           // sign of quotient
   du_int r;
-  di_int q = (__udivmoddi4(a, b, &r) ^ s_b) - s_b;      // negate if s_b == -1
-  *rem = (r ^ s_a) - s_a;                               // negate if s_a == -1
+  di_int q = (di_int)((__udivmoddi4((du_int)a, (du_int)b, &r) ^ (du_int)s_b) - (du_int)s_b);      // negate if s_b == -1
+  *rem = (di_int)((r ^ (du_int)s_a) - (du_int)s_a);                               // negate if s_a == -1
   return q;
 }
 //===-- divmodsi4.c - Implement __divmodsi4
@@ -1251,12 +1251,12 @@ COMPILER_RT_ABI si_int __divmodsi4(si_int a, si_int b, si_int *rem) {
   const int bits_in_word_m1 = (int)(sizeof(si_int) * CHAR_BIT) - 1;
   si_int s_a = a >> bits_in_word_m1;                    // s_a = a < 0 ? -1 : 0
   si_int s_b = b >> bits_in_word_m1;                    // s_b = b < 0 ? -1 : 0
-  a = (su_int)(a ^ s_a) - s_a;                          // negate if s_a == -1
-  b = (su_int)(b ^ s_b) - s_b;                          // negate if s_b == -1
+  a = (si_int)((su_int)(a ^ s_a) - (su_int)s_a);        // negate if s_a == -1
+  b = (si_int)((su_int)(b ^ s_b) - (su_int)s_b);        // negate if s_b == -1
   s_b ^= s_a;                                           // sign of quotient
   su_int r;
-  si_int q = (__udivmodsi4(a, b, &r) ^ s_b) - s_b;      // negate if s_b == -1
-  *rem = (r ^ s_a) - s_a;                               // negate if s_a == -1
+  si_int q = (si_int)((__udivmodsi4((su_int)a, (su_int)b, &r) ^ (su_int)s_b) - (su_int)s_b);      // negate if s_b == -1
+  *rem = (si_int)((r ^ (su_int)s_a) - (su_int)s_a);                               // negate if s_a == -1
   return q;
 }
 //===-- divmodti4.c - Implement __divmodti4 -------------------------------===//
@@ -1280,12 +1280,12 @@ COMPILER_RT_ABI ti_int __divmodti4(ti_int a, ti_int b, ti_int *rem) {
   const int bits_in_tword_m1 = (int)(sizeof(ti_int) * CHAR_BIT) - 1;
   ti_int s_a = a >> bits_in_tword_m1;                   // s_a = a < 0 ? -1 : 0
   ti_int s_b = b >> bits_in_tword_m1;                   // s_b = b < 0 ? -1 : 0
-  a = (tu_int)(a ^ s_a) - s_a;                          // negate if s_a == -1
-  b = (tu_int)(b ^ s_b) - s_b;                          // negate if s_b == -1
+  a = (ti_int)((tu_int)(a ^ s_a) - (tu_int)s_a);        // negate if s_a == -1
+  b = (ti_int)((tu_int)(b ^ s_b) - (tu_int)s_b);        // negate if s_b == -1
   s_b ^= s_a;                                           // sign of quotient
   tu_int r;
-  ti_int q = (__udivmodti4(a, b, &r) ^ s_b) - s_b;      // negate if s_b == -1
-  *rem = (r ^ s_a) - s_a;                               // negate if s_a == -1
+  ti_int q = (ti_int)((__udivmodti4((tu_int)a, (tu_int)b, &r) ^ (tu_int)s_b) - (tu_int)s_b);      // negate if s_b == -1
+  *rem = (ti_int)((r ^ (tu_int)s_a) - (tu_int)s_a);                               // negate if s_a == -1
   return q;
 }
 
@@ -1316,10 +1316,10 @@ COMPILER_RT_ABI si_int __divsi3(si_int a, si_int b) {
   const int N = (int)(sizeof(si_int) * CHAR_BIT) - 1;
   si_int s_a = a >> N;                            // s_a = a < 0 ? -1 : 0
   si_int s_b = b >> N;                            // s_b = b < 0 ? -1 : 0
-  su_int a_u = (su_int)(a ^ s_a) + (-s_a);    // negate if s_a == -1
-  su_int b_u = (su_int)(b ^ s_b) + (-s_b);    // negate if s_b == -1
+  su_int a_u = (su_int)(a ^ s_a) + (su_int)(-s_a);    // negate if s_a == -1
+  su_int b_u = (su_int)(b ^ s_b) + (su_int)(-s_b);    // negate if s_b == -1
   s_a ^= s_b;                                       // sign of quotient
-  return (((su_int)a_u / (su_int)b_u) ^ s_a) + (-s_a);   // negate if s_a == -1
+  return (si_int)((((su_int)a_u / (su_int)b_u) ^ (su_int)s_a) + (su_int)(-s_a));   // negate if s_a == -1
 }
 
 #if defined(__ARM_EABI__)
@@ -1348,10 +1348,10 @@ COMPILER_RT_ABI ti_int __divti3(ti_int a, ti_int b) {
   const int N = (int)(sizeof(ti_int) * CHAR_BIT) - 1;
   ti_int s_a = a >> N;                            // s_a = a < 0 ? -1 : 0
   ti_int s_b = b >> N;                            // s_b = b < 0 ? -1 : 0
-  tu_int a_u = (tu_int)(a ^ s_a) + (-s_a);    // negate if s_a == -1
-  tu_int b_u = (tu_int)(b ^ s_b) + (-s_b);    // negate if s_b == -1
+  tu_int a_u = (tu_int)(a ^ s_a) + (tu_int)(-s_a);    // negate if s_a == -1
+  tu_int b_u = (tu_int)(b ^ s_b) + (tu_int)(-s_b);    // negate if s_b == -1
   s_a ^= s_b;                                       // sign of quotient
-  return (__udivmodti4(a_u, b_u, (tu_int *)0) ^ s_a) + (-s_a);   // negate if s_a == -1
+  return (ti_int)((__udivmodti4(a_u, b_u, (tu_int *)0) ^ (tu_int)s_a) + (tu_int)(-s_a));   // negate if s_a == -1
 }
 
 #endif // CRT_HAS_128BIT
@@ -1377,7 +1377,7 @@ COMPILER_RT_ABI int __ffsdi2(di_int a) {
   if (x.s.low == 0) {
     if (x.s.high == 0)
       return 0;
-    return ctzsi(x.s.high) + (1 + sizeof(si_int) * CHAR_BIT);
+    return (int)((unsigned long)ctzsi((unsigned)x.s.high) + (1 + sizeof(si_int) * CHAR_BIT));
   }
   return ctzsi(x.s.low) + 1;
 }
@@ -1401,7 +1401,7 @@ COMPILER_RT_ABI int __ffssi2(si_int a) {
   if (a == 0) {
     return 0;
   }
-  return ctzsi(a) + 1;
+  return ctzsi((unsigned)a) + 1;
 }
 //===-- ffsti2.c - Implement __ffsti2 -------------------------------------===//
 //
@@ -1427,7 +1427,7 @@ COMPILER_RT_ABI int __ffsti2(ti_int a) {
   if (x.s.low == 0) {
     if (x.s.high == 0)
       return 0;
-    return __builtin_ctzll(x.s.high) + (1 + sizeof(di_int) * CHAR_BIT);
+    return (int)((unsigned long)__builtin_ctzll((unsigned long long)x.s.high) + (1 + sizeof(di_int) * CHAR_BIT));
   }
   return __builtin_ctzll(x.s.low) + 1;
 }
@@ -1485,7 +1485,7 @@ COMPILER_RT_ABI di_int __lshrdi3(di_int a, int b) {
   const int bits_in_word = (int)(sizeof(si_int) * CHAR_BIT);
   udwords input;
   udwords result;
-  input.all = a;
+  input.all = (du_int)a;
   if (b & bits_in_word) /* bits_in_word <= b < bits_in_dword */ {
     result.s.high = 0;
     result.s.low = input.s.high >> (b - bits_in_word);
@@ -1495,7 +1495,7 @@ COMPILER_RT_ABI di_int __lshrdi3(di_int a, int b) {
     result.s.high = input.s.high >> b;
     result.s.low = (input.s.high << (bits_in_word - b)) | (input.s.low >> b);
   }
-  return result.all;
+  return (di_int)result.all;
 }
 
 #if defined(__ARM_EABI__)
@@ -1524,7 +1524,7 @@ COMPILER_RT_ABI ti_int __lshrti3(ti_int a, int b) {
   const int bits_in_dword = (int)(sizeof(di_int) * CHAR_BIT);
   utwords input;
   utwords result;
-  input.all = a;
+  input.all = (tu_int)a;
   if (b & bits_in_dword) /* bits_in_dword <= b < bits_in_tword */ {
     result.s.high = 0;
     result.s.low = input.s.high >> (b - bits_in_dword);
@@ -1534,7 +1534,7 @@ COMPILER_RT_ABI ti_int __lshrti3(ti_int a, int b) {
     result.s.high = input.s.high >> b;
     result.s.low = (input.s.high << (bits_in_dword - b)) | (input.s.low >> b);
   }
-  return result.all;
+  return (ti_int)result.all;
 }
 
 #endif // CRT_HAS_128BIT
@@ -1558,12 +1558,12 @@ COMPILER_RT_ABI ti_int __lshrti3(ti_int a, int b) {
 COMPILER_RT_ABI di_int __moddi3(di_int a, di_int b) {
   const int N = (int)(sizeof(di_int) * CHAR_BIT) - 1;
   di_int s = b >> N;                              // s = b < 0 ? -1 : 0
-  du_int b_u = (du_int)(b ^ s) + (-s);        // negate if s == -1
+  du_int b_u = (du_int)(b ^ s) + (du_int)(-s);        // negate if s == -1
   s = a >> N;                                       // s = a < 0 ? -1 : 0
-  du_int a_u = (du_int)(a ^ s) + (-s);        // negate if s == -1
+  du_int a_u = (du_int)(a ^ s) + (du_int)(-s);        // negate if s == -1
   du_int res;
   __udivmoddi4(a_u, b_u, &res);
-  return (res ^ s) + (-s);                          // negate if s == -1
+  return (di_int)((res ^ (du_int)s) + (du_int)(-s));                          // negate if s == -1
 }
 //===-- modsi3.c - Implement __modsi3 -------------------------------------===//
 //
@@ -1605,12 +1605,12 @@ COMPILER_RT_ABI si_int __modsi3(si_int a, si_int b) {
 COMPILER_RT_ABI ti_int __modti3(ti_int a, ti_int b) {
   const int N = (int)(sizeof(ti_int) * CHAR_BIT) - 1;
   ti_int s = b >> N;                              // s = b < 0 ? -1 : 0
-  tu_int b_u = (tu_int)(b ^ s) + (-s);        // negate if s == -1
+  tu_int b_u = (tu_int)(b ^ s) + (tu_int)(-s);        // negate if s == -1
   s = a >> N;                                       // s = a < 0 ? -1 : 0
-  tu_int a_u = (tu_int)(a ^ s) + (-s);        // negate if s == -1
+  tu_int a_u = (tu_int)(a ^ s) + (tu_int)(-s);        // negate if s == -1
   tu_int res;
   __udivmodti4(a_u, b_u, &res);
-  return (res ^ s) + (-s);                          // negate if s == -1
+  return (ti_int)((res ^ (tu_int)s) + (tu_int)(-s));                          // negate if s == -1
 }
 
 #endif // CRT_HAS_128BIT
@@ -1638,7 +1638,7 @@ static di_int __muldsi3(su_int a, su_int b) {
   r.s.low &= lower_mask;
   t += (a >> bits_in_word_2) * (b & lower_mask);
   r.s.low += (t & lower_mask) << bits_in_word_2;
-  r.s.high = t >> bits_in_word_2;
+  r.s.high = (si_int)(t >> bits_in_word_2);
   t = r.s.low >> bits_in_word_2;
   r.s.low &= lower_mask;
   t += (b >> bits_in_word_2) * (a & lower_mask);
@@ -1657,7 +1657,7 @@ COMPILER_RT_ABI di_int __muldi3(di_int a, di_int b) {
   y.all = b;
   dwords r;
   r.all = __muldsi3(x.s.low, y.s.low);
-  r.s.high += x.s.high * y.s.low + x.s.low * y.s.high;
+  r.s.high += (su_int)x.s.high * y.s.low + x.s.low * (su_int)y.s.high;
   return r.all;
 }
 
@@ -1688,7 +1688,7 @@ COMPILER_RT_ABI di_int __mulodi4(di_int a, di_int b, int *overflow) {
   const di_int MIN = (di_int)((du_int)1 << (N - 1));
   const di_int MAX = ~MIN;
   *overflow = 0;
-  di_int result = (du_int)a * b;
+  di_int result = (di_int)((du_int)a * (du_int)b);
   if (a == MIN) {
     if (b != 0 && b != 1)
       *overflow = 1;
@@ -1738,7 +1738,7 @@ COMPILER_RT_ABI si_int __mulosi4(si_int a, si_int b, int *overflow) {
   const si_int MIN = (si_int)((su_int)1 << (N - 1));
   const si_int MAX = ~MIN;
   *overflow = 0;
-  si_int result = (su_int)a * b;
+  si_int result = (si_int)((su_int)a * (su_int)b);
   if (a == MIN) {
     if (b != 0 && b != 1)
       *overflow = 1;
@@ -1790,7 +1790,7 @@ COMPILER_RT_ABI ti_int __muloti4(ti_int a, ti_int b, int *overflow) {
   const ti_int MIN = (ti_int)((tu_int)1 << (N - 1));
   const ti_int MAX = ~MIN;
   *overflow = 0;
-  ti_int result = (tu_int)a * b;
+  ti_int result = (ti_int)((tu_int)a * (tu_int)b);
   if (a == MIN) {
     if (b != 0 && b != 1)
       *overflow = 1;
@@ -1844,7 +1844,7 @@ static ti_int __mulddi3(du_int a, du_int b) {
   r.s.low &= lower_mask;
   t += (a >> bits_in_dword_2) * (b & lower_mask);
   r.s.low += (t & lower_mask) << bits_in_dword_2;
-  r.s.high = t >> bits_in_dword_2;
+  r.s.high = (di_int)(t >> bits_in_dword_2);
   t = r.s.low >> bits_in_dword_2;
   r.s.low &= lower_mask;
   t += (b >> bits_in_dword_2) * (a & lower_mask);
@@ -1863,7 +1863,7 @@ COMPILER_RT_ABI ti_int __multi3(ti_int a, ti_int b) {
   y.all = b;
   twords r;
   r.all = __mulddi3(x.s.low, y.s.low);
-  r.s.high += x.s.high * y.s.low + x.s.low * y.s.high;
+  r.s.high += (du_int)x.s.high * y.s.low + x.s.low * (du_int)y.s.high;
   return r.all;
 }
 
@@ -2034,7 +2034,7 @@ COMPILER_RT_ABI ti_int __mulvti3(ti_int a, ti_int b) {
 COMPILER_RT_ABI di_int __negdi2(di_int a) {
   // Note: this routine is here for API compatibility; any sane compiler
   // should expand it inline.
-  return -(du_int)a;
+  return (di_int)(-(du_int)a);
 }
 //===-- negti2.c - Implement __negti2 -------------------------------------===//
 //
@@ -2056,7 +2056,7 @@ COMPILER_RT_ABI di_int __negdi2(di_int a) {
 COMPILER_RT_ABI ti_int __negti2(ti_int a) {
   // Note: this routine is here for API compatibility; any sane compiler
   // should expand it inline.
-  return -(tu_int)a;
+  return (ti_int)(-(tu_int)a);
 }
 
 #endif // CRT_HAS_128BIT
@@ -2128,7 +2128,7 @@ COMPILER_RT_ABI si_int __negvsi2(si_int a) {
 // Effects: aborts if -a overflows
 
 COMPILER_RT_ABI ti_int __negvti2(ti_int a) {
-  const ti_int MIN = (tu_int)1 << ((int)(sizeof(ti_int) * CHAR_BIT) - 1);
+  const ti_int MIN = (ti_int)((tu_int)1 << ((int)(sizeof(ti_int) * CHAR_BIT) - 1));
   if (a == MIN)
     compilerrt_abort();
   return -a;
@@ -2153,7 +2153,7 @@ COMPILER_RT_ABI ti_int __negvti2(ti_int a) {
 COMPILER_RT_ABI int __paritydi2(di_int a) {
   dwords x;
   x.all = a;
-  su_int x2 = x.s.high ^ x.s.low;
+  su_int x2 = (su_int)x.s.high ^ x.s.low;
   x2 ^= x2 >> 16;
   x2 ^= x2 >> 8;
   x2 ^= x2 >> 4;
@@ -2202,8 +2202,8 @@ COMPILER_RT_ABI int __parityti2(ti_int a) {
   twords x;
   dwords x2;
   x.all = a;
-  x2.all = x.s.high ^ x.s.low;
-  su_int x3 = x2.s.high ^ x2.s.low;
+  x2.all = (di_int)((du_int)x.s.high ^ x.s.low);
+  su_int x3 = (su_int)x2.s.high ^ x2.s.low;
   x3 ^= x3 >> 16;
   x3 ^= x3 >> 8;
   x3 ^= x3 >> 4;
@@ -2330,7 +2330,7 @@ COMPILER_RT_ABI int __popcountti2(ti_int a) {
 // Effects: aborts if a - b overflows
 
 COMPILER_RT_ABI di_int __subvdi3(di_int a, di_int b) {
-  di_int s = (du_int)a - (du_int)b;
+  di_int s = (di_int)((du_int)a - (du_int)b);
   if (b >= 0) {
     if (s > a)
       compilerrt_abort();
@@ -2358,7 +2358,7 @@ COMPILER_RT_ABI di_int __subvdi3(di_int a, di_int b) {
 // Effects: aborts if a - b overflows
 
 COMPILER_RT_ABI si_int __subvsi3(si_int a, si_int b) {
-  si_int s = (su_int)a - (su_int)b;
+  si_int s = (si_int)((su_int)a - (su_int)b);
   if (b >= 0) {
     if (s > a)
       compilerrt_abort();
@@ -2388,7 +2388,7 @@ COMPILER_RT_ABI si_int __subvsi3(si_int a, si_int b) {
 // Effects: aborts if a - b overflows
 
 COMPILER_RT_ABI ti_int __subvti3(ti_int a, ti_int b) {
-  ti_int s = (tu_int)a - (tu_int)b;
+  ti_int s = (ti_int)((tu_int)a - (tu_int)b);
   if (b >= 0) {
     if (s > a)
       compilerrt_abort();
@@ -2503,7 +2503,7 @@ COMPILER_RT_ABI si_int __ucmpti2(tu_int a, tu_int b) {
 COMPILER_RT_ABI du_int __udivdi3(du_int n, du_int d) {
   const unsigned N = sizeof(du_int) * CHAR_BIT;
   // d == 0 cases are unspecified.
-  unsigned sr = (d ? clz(d) : N) - (n ? clz(n) : N);
+  unsigned sr = (d ? (unsigned)clz(d) : N) - (n ? (unsigned)clz(n) : N);
   // 0 <= sr <= N - 1 or sr is very large.
   if (sr > N - 1) // n < d
     return 0;
@@ -2522,7 +2522,7 @@ COMPILER_RT_ABI du_int __udivdi3(du_int n, du_int d) {
     // if (r >= d) r -= d, carry = 1;
     const di_int s = (di_int)(d - r - 1) >> (N - 1);
     carry = s & 1;
-    r -= d & s;
+    r -= d & (du_int)s;
   }
   n = (n << 1) | carry;
   return n;
@@ -2612,7 +2612,7 @@ COMPILER_RT_ABI du_int __udivmoddi4(du_int a, du_int b, du_int *rem) {
     // K K
     // ---
     // K 0
-    sr = clzsi(d.s.high) - clzsi(n.s.high);
+    sr = (unsigned)(clzsi(d.s.high) - clzsi(n.s.high));
     // 0 <= sr <= n_uword_bits - 2 or sr large
     if (sr > n_uword_bits - 2) {
       if (rem)
@@ -2637,7 +2637,7 @@ COMPILER_RT_ABI du_int __udivmoddi4(du_int a, du_int b, du_int *rem) {
           *rem = n.s.low & (d.s.low - 1);
         if (d.s.low == 1)
           return n.all;
-        sr = ctzsi(d.s.low);
+        sr = (unsigned)ctzsi(d.s.low);
         q.s.high = n.s.high >> sr;
         q.s.low = (n.s.high << (n_uword_bits - sr)) | (n.s.low >> sr);
         return q.all;
@@ -2645,7 +2645,7 @@ COMPILER_RT_ABI du_int __udivmoddi4(du_int a, du_int b, du_int *rem) {
       // K X
       // ---
       // 0 K
-      sr = 1 + n_uword_bits + clzsi(d.s.low) - clzsi(n.s.high);
+      sr = 1 + n_uword_bits + (unsigned)clzsi(d.s.low) - (unsigned)clzsi(n.s.high);
       // 2 <= sr <= n_udword_bits - 1
       // q.all = n.all << (n_udword_bits - sr);
       // r.all = n.all >> sr;
@@ -2670,7 +2670,7 @@ COMPILER_RT_ABI du_int __udivmoddi4(du_int a, du_int b, du_int *rem) {
       // K X
       // ---
       // K K
-      sr = clzsi(d.s.high) - clzsi(n.s.high);
+      sr = (unsigned)(clzsi(d.s.high) - clzsi(n.s.high));
       // 0 <= sr <= n_uword_bits - 1 or sr large
       if (sr > n_uword_bits - 1) {
         if (rem)
@@ -2712,7 +2712,7 @@ COMPILER_RT_ABI du_int __udivmoddi4(du_int a, du_int b, du_int *rem) {
     // }
     const di_int s = (di_int)(d.all - r.all - 1) >> (n_udword_bits - 1);
     carry = s & 1;
-    r.all -= d.all & s;
+    r.all -= d.all & (du_int)s;
   }
   q.all = (q.all << 1) | carry;
   if (rem)
@@ -2735,9 +2735,9 @@ COMPILER_RT_ABI du_int __udivmoddi4(du_int a, du_int b, du_int *rem) {
 // Returns: a / b, *rem = a % b
 
 COMPILER_RT_ABI su_int __udivmodsi4(su_int a, su_int b, su_int *rem) {
-  si_int d = __udivsi3(a, b);
-  *rem = a - (d * b);
-  return d;
+  si_int d = (si_int)__udivsi3(a, b);
+  *rem = a - ((su_int)d * b);
+  return (su_int)d;
 }
 //===-- udivmodti4.c - Implement __udivmodti4 -----------------------------===//
 //
@@ -2775,7 +2775,7 @@ static inline du_int udiv128by64to64default(du_int u1, du_int u0, du_int v,
   if (s > 0) {
     // Normalize the divisor.
     v = v << s;
-    un64 = (u1 << s) | (u0 >> (n_udword_bits - s));
+    un64 = (u1 << s) | (u0 >> (n_udword_bits - (su_int)s));
     un10 = u0 << s; // Shift dividend left
   } else {
     // Avoid undefined behavior of (u0 >> 64).
@@ -2887,7 +2887,7 @@ COMPILER_RT_ABI tu_int __udivmodti4(tu_int a, tu_int b, tu_int *rem) {
     const ti_int s =
         (ti_int)(divisor.all - dividend.all - 1) >> (n_utword_bits - 1);
     quotient.s.low |= s & 1;
-    dividend.all -= divisor.all & s;
+    dividend.all -= divisor.all & (tu_int)s;
     divisor.all >>= 1;
   }
   if (rem)
@@ -2922,7 +2922,7 @@ COMPILER_RT_ABI tu_int __udivmodti4(tu_int a, tu_int b, tu_int *rem) {
 COMPILER_RT_ABI su_int __udivsi3(su_int n, su_int d) {
   const unsigned N = sizeof(su_int) * CHAR_BIT;
   // d == 0 cases are unspecified.
-  unsigned sr = (d ? clz(d) : N) - (n ? clz(n) : N);
+  unsigned sr = (d ? (unsigned)clz(d) : N) - (n ? (unsigned)clz(n) : N);
   // 0 <= sr <= N - 1 or sr is very large.
   if (sr > N - 1) // n < d
     return 0;
@@ -2941,7 +2941,7 @@ COMPILER_RT_ABI su_int __udivsi3(su_int n, su_int d) {
     // if (r >= d) r -= d, carry = 1;
     const si_int s = (si_int)(d - r - 1) >> (N - 1);
     carry = s & 1;
-    r -= d & s;
+    r -= d & (su_int)s;
   }
   n = (n << 1) | carry;
   return n;
@@ -3000,7 +3000,7 @@ COMPILER_RT_ABI tu_int __udivti3(tu_int a, tu_int b) {
 COMPILER_RT_ABI du_int __umoddi3(du_int n, du_int d) {
   const unsigned N = sizeof(du_int) * CHAR_BIT;
   // d == 0 cases are unspecified.
-  unsigned sr = (d ? clz(d) : N) - (n ? clz(n) : N);
+  unsigned sr = (d ? (unsigned)clz(d) : N) - (n ? (unsigned)clz(n) : N);
   // 0 <= sr <= N - 1 or sr is very large.
   if (sr > N - 1) // n < d
     return n;
@@ -3019,7 +3019,7 @@ COMPILER_RT_ABI du_int __umoddi3(du_int n, du_int d) {
     // if (r >= d) r -= d, carry = 1;
     const di_int s = (di_int)(d - r - 1) >> (N - 1);
     carry = s & 1;
-    r -= d & s;
+    r -= d & (unsigned)s;
   }
   return r;
 }
@@ -3051,7 +3051,7 @@ COMPILER_RT_ABI du_int __umoddi3(du_int n, du_int d) {
 COMPILER_RT_ABI su_int __umodsi3(su_int n, su_int d) {
   const unsigned N = sizeof(su_int) * CHAR_BIT;
   // d == 0 cases are unspecified.
-  unsigned sr = (d ? clz(d) : N) - (n ? clz(n) : N);
+  unsigned sr = (d ? (unsigned)clz(d) : N) - (n ? (unsigned)clz(n) : N);
   // 0 <= sr <= N - 1 or sr is very large.
   if (sr > N - 1) // n < d
     return n;
@@ -3070,7 +3070,7 @@ COMPILER_RT_ABI su_int __umodsi3(su_int n, su_int d) {
     // if (r >= d) r -= d, carry = 1;
     const si_int s = (si_int)(d - r - 1) >> (N - 1);
     carry = s & 1;
-    r -= d & s;
+    r -= d & (su_int)s;
   }
   return r;
 }
