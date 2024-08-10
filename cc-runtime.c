@@ -866,6 +866,8 @@ COMPILER_RT_ABI uint32_t __bswapsi2(uint32_t u) {
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
+// 2024/08/10 - Modified by mintsuki for use inside cc-runtime
+//
 //===----------------------------------------------------------------------===//
 //
 // This file implements __clzdi2 for the compiler_rt library.
@@ -1056,6 +1058,8 @@ COMPILER_RT_ABI si_int __cmpti2(ti_int a, ti_int b) {
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
+// 2024/08/10 - Modified by mintsuki for use inside cc-runtime
+//
 //===----------------------------------------------------------------------===//
 //
 // This file implements __ctzdi2 for the compiler_rt library.
@@ -1174,6 +1178,8 @@ COMPILER_RT_ABI int __ctzti2(ti_int a) {
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
+// 2024/08/10 - Modified by mintsuki for use inside cc-runtime
+//
 //===----------------------------------------------------------------------===//
 //
 // This file implements __divdi3 for the compiler_rt library.
@@ -1284,6 +1290,8 @@ COMPILER_RT_ABI ti_int __divmodti4(ti_int a, ti_int b, ti_int *rem) {
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
+// 2024/08/10 - Modified by mintsuki for use inside cc-runtime
+//
 //===----------------------------------------------------------------------===//
 //
 // This file implements __divsi3 for the compiler_rt library.
@@ -1316,6 +1324,8 @@ COMPILER_RT_ALIAS(__divsi3, __aeabi_idiv)
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+// 2024/08/10 - Modified by mintsuki for use inside cc-runtime
 //
 //===----------------------------------------------------------------------===//
 //
@@ -1528,6 +1538,8 @@ COMPILER_RT_ABI ti_int __lshrti3(ti_int a, int b) {
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
+// 2024/08/10 - Modified by mintsuki for use inside cc-runtime
+//
 //===----------------------------------------------------------------------===//
 //
 // This file implements __moddi3 for the compiler_rt library.
@@ -1570,6 +1582,8 @@ COMPILER_RT_ABI si_int __modsi3(si_int a, si_int b) {
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+// 2024/08/10 - Modified by mintsuki for use inside cc-runtime
 //
 //===----------------------------------------------------------------------===//
 //
@@ -1650,6 +1664,8 @@ COMPILER_RT_ALIAS(__muldi3, __aeabi_lmul)
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
+// 2024/08/10 - Modified by mintsuki for use inside cc-runtime
+//
 //===----------------------------------------------------------------------===//
 //
 // This file implements __mulodi4 for the compiler_rt library.
@@ -1698,6 +1714,8 @@ COMPILER_RT_ABI di_int __mulodi4(di_int a, di_int b, int *overflow) {
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
+// 2024/08/10 - Modified by mintsuki for use inside cc-runtime
+//
 //===----------------------------------------------------------------------===//
 //
 // This file implements __mulosi4 for the compiler_rt library.
@@ -1745,6 +1763,8 @@ COMPILER_RT_ABI si_int __mulosi4(si_int a, si_int b, int *overflow) {
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+// 2024/08/10 - Modified by mintsuki for use inside cc-runtime
 //
 //===----------------------------------------------------------------------===//
 //
@@ -1848,6 +1868,8 @@ COMPILER_RT_ABI ti_int __multi3(ti_int a, ti_int b) {
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
+// 2024/08/10 - Modified by mintsuki for use inside cc-runtime
+//
 //===----------------------------------------------------------------------===//
 //
 // This file implements __mulvdi3 for the compiler_rt library.
@@ -1894,6 +1916,8 @@ COMPILER_RT_ABI di_int __mulvdi3(di_int a, di_int b) {
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
+// 2024/08/10 - Modified by mintsuki for use inside cc-runtime
+//
 //===----------------------------------------------------------------------===//
 //
 // This file implements __mulvsi3 for the compiler_rt library.
@@ -1939,6 +1963,8 @@ COMPILER_RT_ABI si_int __mulvsi3(si_int a, si_int b) {
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+// 2024/08/10 - Modified by mintsuki for use inside cc-runtime
 //
 //===----------------------------------------------------------------------===//
 //
@@ -2451,6 +2477,8 @@ COMPILER_RT_ABI si_int __ucmpti2(tu_int a, tu_int b) {
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
+// 2024/08/10 - Modified by mintsuki for use inside cc-runtime
+//
 //===----------------------------------------------------------------------===//
 //
 // This file implements __udivdi3 for the compiler_rt library.
@@ -2864,6 +2892,8 @@ COMPILER_RT_ABI tu_int __udivmodti4(tu_int a, tu_int b, tu_int *rem) {
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
+// 2024/08/10 - Modified by mintsuki for use inside cc-runtime
+//
 //===----------------------------------------------------------------------===//
 //
 // This file implements __udivsi3 for the compiler_rt library.
@@ -2936,6 +2966,8 @@ COMPILER_RT_ABI tu_int __udivti3(tu_int a, tu_int b) {
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
+// 2024/08/10 - Modified by mintsuki for use inside cc-runtime
+//
 //===----------------------------------------------------------------------===//
 //
 // This file implements __umoddi3 for the compiler_rt library.
@@ -2980,6 +3012,8 @@ COMPILER_RT_ABI du_int __umoddi3(du_int n, du_int d) {
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+// 2024/08/10 - Modified by mintsuki for use inside cc-runtime
 //
 //===----------------------------------------------------------------------===//
 //
