@@ -875,16 +875,6 @@ COMPILER_RT_ABI uint32_t __bswapsi2(uint32_t u) {
 
 // Returns: the number of leading 0-bits
 
-#if !defined(__clang__) &&                                                     \
-    ((defined(__sparc__) && defined(__arch64__)) || defined(__mips64) ||       \
-     (defined(__riscv) && __SIZEOF_POINTER__ >= 8))
-// On 64-bit architectures with neither a native clz instruction nor a native
-// ctz instruction, gcc resolves __builtin_clz to __clzdi2 rather than
-// __clzsi2, leading to infinite recursion.
-#define __builtin_clz(a) __clzsi2(a)
-extern int __clzsi2(si_int);
-#endif
-
 // Precondition: a != 0
 
 COMPILER_RT_ABI int __clzdi2(di_int a) {
@@ -1060,16 +1050,6 @@ COMPILER_RT_ABI si_int __cmpti2(ti_int a, ti_int b) {
 
 
 // Returns: the number of trailing 0-bits
-
-#if !defined(__clang__) &&                                                     \
-    ((defined(__sparc__) && defined(__arch64__)) || defined(__mips64) ||       \
-     (defined(__riscv) && __SIZEOF_POINTER__ >= 8))
-// On 64-bit architectures with neither a native clz instruction nor a native
-// ctz instruction, gcc resolves __builtin_ctz to __ctzdi2 rather than
-// __ctzsi2, leading to infinite recursion.
-#define __builtin_ctz(a) __ctzsi2(a)
-extern int __ctzsi2(si_int);
-#endif
 
 // Precondition: a != 0
 
