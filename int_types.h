@@ -100,20 +100,6 @@ typedef union {
   } s;
 } utwords;
 
-static __inline ti_int make_ti(di_int h, di_int l) {
-  twords r;
-  r.s.high = (du_int)h;
-  r.s.low = (du_int)l;
-  return r.all;
-}
-
-static __inline tu_int make_tu(du_int h, du_int l) {
-  utwords r;
-  r.s.high = h;
-  r.s.low = l;
-  return r.all;
-}
-
 #endif // CRT_HAS_128BIT
 
 #endif // INT_TYPES_H
