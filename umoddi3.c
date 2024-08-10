@@ -21,7 +21,7 @@
 COMPILER_RT_ABI du_int __umoddi3(du_int n, du_int d) {
   const unsigned N = sizeof(du_int) * CHAR_BIT;
   // d == 0 cases are unspecified.
-  unsigned sr = (d ? clz(d) : N) - (n ? clz(n) : N);
+  unsigned sr = (d ? (unsigned)clz(d) : N) - (n ? (unsigned)clz(n) : N);
   // 0 <= sr <= N - 1 or sr is very large.
   if (sr > N - 1) // n < d
     return n;
