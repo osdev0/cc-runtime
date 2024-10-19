@@ -14,40 +14,14 @@
 
 #include "int_lib.h"
 
+typedef su_int fixuint_t;
+typedef si_int fixint_t;
+#include "int_div_impl.inc"
+
 // Returns: a / b
 
-#ifdef clz
-#undef clz
-#endif
-#define clz(a) (sizeof(a) == sizeof(unsigned long long) ? __builtin_clzll(a) : clzsi(a))
-
-// Adapted from Figure 3-40 of The PowerPC Compiler Writer's Guide
-COMPILER_RT_ABI su_int __udivsi3(su_int n, su_int d) {
-  const unsigned N = sizeof(su_int) * CHAR_BIT;
-  // d == 0 cases are unspecified.
-  unsigned sr = (d ? clz(d) : N) - (n ? clz(n) : N);
-  // 0 <= sr <= N - 1 or sr is very large.
-  if (sr > N - 1) // n < d
-    return 0;
-  if (sr == N - 1) // d == 1
-    return n;
-  ++sr;
-  // 1 <= sr <= N - 1. Shifts do not trigger UB.
-  su_int r = n >> sr;
-  n <<= N - sr;
-  su_int carry = 0;
-  for (; sr > 0; --sr) {
-    r = (r << 1) | (n >> (N - 1));
-    n = (n << 1) | carry;
-    // Branch-less version of:
-    // carry = 0;
-    // if (r >= d) r -= d, carry = 1;
-    const si_int s = (si_int)(d - r - 1) >> (N - 1);
-    carry = s & 1;
-    r -= d & s;
-  }
-  n = (n << 1) | carry;
-  return n;
+COMPILER_RT_ABI su_int __udivsi3(su_int a, su_int b) {
+  return __udivXi3(a, b);
 }
 
 #undef clz

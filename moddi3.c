@@ -16,13 +16,9 @@
 
 // Returns: a % b
 
-COMPILER_RT_ABI di_int __moddi3(di_int a, di_int b) {
-  const int N = (int)(sizeof(di_int) * CHAR_BIT) - 1;
-  di_int s = b >> N;                              // s = b < 0 ? -1 : 0
-  du_int b_u = (du_int)(b ^ s) + (-s);        // negate if s == -1
-  s = a >> N;                                       // s = a < 0 ? -1 : 0
-  du_int a_u = (du_int)(a ^ s) + (-s);        // negate if s == -1
-  du_int res;
-  __udivmoddi4(a_u, b_u, &res);
-  return (res ^ s) + (-s);                          // negate if s == -1
-}
+#define fixint_t di_int
+#define fixuint_t du_int
+#define ASSIGN_UMOD(res, a, b) __udivmoddi4((a), (b), &(res))
+#include "int_div_impl.inc"
+
+COMPILER_RT_ABI di_int __moddi3(di_int a, di_int b) { return __modXi3(a, b); }
