@@ -14,8 +14,8 @@
 
 #include "int_lib.h"
 
-typedef su_int fixuint_t;
-typedef si_int fixint_t;
+#define fixuint_t su_int
+#define fixint_t si_int
 #include "int_div_impl.inc"
 
 // Returns: a / b
@@ -24,8 +24,9 @@ COMPILER_RT_ABI su_int __udivsi3(su_int a, su_int b) {
   return __udivXi3(a, b);
 }
 
-#undef clz
-
 #if defined(__ARM_EABI__)
 COMPILER_RT_ALIAS(__udivsi3, __aeabi_uidiv)
 #endif
+
+#undef fixuint_t
+#undef fixint_t

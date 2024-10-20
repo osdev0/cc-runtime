@@ -21,3 +21,6 @@
 // Effects: aborts if a * b overflows
 
 COMPILER_RT_ABI di_int __mulvdi3(di_int a, di_int b) { return __mulvXi3(a, b); }
+
+#undef fixint_t
+#undef fixuint_t

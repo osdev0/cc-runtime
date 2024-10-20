@@ -25,4 +25,8 @@
 
 COMPILER_RT_ABI ti_int __divti3(ti_int a, ti_int b) { return __divXi3(a, b); }
 
+#undef fixint_t
+#undef fixuint_t
+#undef COMPUTE_UDIV
+
 #endif // CRT_HAS_128BIT

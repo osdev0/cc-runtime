@@ -26,4 +26,7 @@
 
 COMPILER_RT_ABI ti_int __mulvti3(ti_int a, ti_int b) { return __mulvXi3(a, b); }
 
+#undef fixint_t
+#undef fixuint_t
+
 #endif // CRT_HAS_128BIT

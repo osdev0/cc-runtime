@@ -22,9 +22,6 @@
 // On 64-bit architectures with neither a native clz instruction nor a native
 // ctz instruction, gcc resolves __builtin_ctz to __ctzdi2 rather than
 // __ctzsi2, leading to infinite recursion.
-#ifdef __builtin_ctz
-#undef __builtin_ctz
-#endif
 #define __builtin_ctz(a) __ctzsi2(a)
 extern int __ctzsi2(si_int);
 #endif

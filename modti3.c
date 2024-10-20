@@ -25,4 +25,8 @@
 
 COMPILER_RT_ABI ti_int __modti3(ti_int a, ti_int b) { return __modXi3(a, b); }
 
+#undef fixint_t
+#undef fixuint_t
+#undef ASSIGN_UMOD
+
 #endif // CRT_HAS_128BIT

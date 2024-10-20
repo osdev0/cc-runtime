@@ -23,3 +23,6 @@
 COMPILER_RT_ABI si_int __mulosi4(si_int a, si_int b, int *overflow) {
   return __muloXi4(a, b, overflow);
 }
+
+#undef fixint_t
+#undef fixuint_t

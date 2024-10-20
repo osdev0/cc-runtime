@@ -28,4 +28,7 @@ COMPILER_RT_ABI ti_int __muloti4(ti_int a, ti_int b, int *overflow) {
   return __muloXi4(a, b, overflow);
 }
 
+#undef fixint_t
+#undef fixuint_t
+
 #endif // CRT_HAS_128BIT
