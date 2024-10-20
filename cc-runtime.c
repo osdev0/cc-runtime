@@ -1,6 +1,8 @@
 #include <limits.h>
 #include <stdbool.h>
 #include <stdint.h>
+#pragma GCC diagnostic ignored "-Wunused-function"
+
 //===-- assembly.h - compiler-rt assembler support macros -----------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -883,9 +885,6 @@ COMPILER_RT_ABI uint32_t __bswapsi2(uint32_t u) {
 // On 64-bit architectures with neither a native clz instruction nor a native
 // ctz instruction, gcc resolves __builtin_clz to __clzdi2 rather than
 // __clzsi2, leading to infinite recursion.
-#ifdef __builtin_clz
-#undef __builtin_clz
-#endif
 #define __builtin_clz(a) __clzsi2(a)
 extern int __clzsi2(si_int);
 #endif
@@ -1078,9 +1077,6 @@ COMPILER_RT_ABI si_int __cmpti2(ti_int a, ti_int b) {
 // On 64-bit architectures with neither a native clz instruction nor a native
 // ctz instruction, gcc resolves __builtin_ctz to __ctzdi2 rather than
 // __ctzsi2, leading to infinite recursion.
-#ifdef __builtin_ctz
-#undef __builtin_ctz
-#endif
 #define __builtin_ctz(a) __ctzsi2(a)
 extern int __ctzsi2(si_int);
 #endif
@@ -1195,15 +1191,130 @@ COMPILER_RT_ABI int __ctzti2(ti_int a) {
 
 // Returns: a / b
 
-COMPILER_RT_ABI di_int __divdi3(di_int a, di_int b) {
-  const int N = (int)(sizeof(di_int) * CHAR_BIT) - 1;
-  di_int s_a = a >> N;                            // s_a = a < 0 ? -1 : 0
-  di_int s_b = b >> N;                            // s_b = b < 0 ? -1 : 0
-  du_int a_u = (du_int)(a ^ s_a) + (-s_a);    // negate if s_a == -1
-  du_int b_u = (du_int)(b ^ s_b) + (-s_b);    // negate if s_b == -1
-  s_a ^= s_b;                                       // sign of quotient
-  return (__udivmoddi4(a_u, b_u, (du_int *)0) ^ s_a) + (-s_a);   // negate if s_a == -1
+#define fixint_t di_int
+#define fixuint_t du_int
+#define COMPUTE_UDIV(a, b) __udivmoddi4((a), (b), (du_int *)0)
+//===-- int_div_impl.inc - Integer division ---------------------*- C++ -*-===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+// 2024/10/20 - Modified by mintsuki for use inside cc-runtime
+//
+//===----------------------------------------------------------------------===//
+//
+// Helpers used by __udivsi3, __umodsi3, __udivdi3, and __umodsi3.
+//
+//===----------------------------------------------------------------------===//
+
+#define clz(a) (sizeof(a) == sizeof(unsigned long long) ? __builtin_clzll(a) : clzsi(a))
+
+#undef __udivXi3
+#define __udivXi3 __udivXi3_1
+
+// Adapted from Figure 3-40 of The PowerPC Compiler Writer's Guide
+static __inline fixuint_t __udivXi3(fixuint_t n, fixuint_t d) {
+  const unsigned N = sizeof(fixuint_t) * CHAR_BIT;
+  // d == 0 cases are unspecified.
+  unsigned sr = (d ? clz(d) : N) - (n ? clz(n) : N);
+  // 0 <= sr <= N - 1 or sr is very large.
+  if (sr > N - 1) // n < d
+    return 0;
+  if (sr == N - 1) // d == 1
+    return n;
+  ++sr;
+  // 1 <= sr <= N - 1. Shifts do not trigger UB.
+  fixuint_t r = n >> sr;
+  n <<= N - sr;
+  fixuint_t carry = 0;
+  for (; sr > 0; --sr) {
+    r = (r << 1) | (n >> (N - 1));
+    n = (n << 1) | carry;
+    // Branch-less version of:
+    // carry = 0;
+    // if (r >= d) r -= d, carry = 1;
+    const fixint_t s = (fixint_t)(d - r - 1) >> (N - 1);
+    carry = s & 1;
+    r -= d & s;
+  }
+  n = (n << 1) | carry;
+  return n;
 }
+
+#undef __umodXi3
+#define __umodXi3 __umodXi3_2
+
+// Mostly identical to __udivXi3 but the return values are different.
+static __inline fixuint_t __umodXi3(fixuint_t n, fixuint_t d) {
+  const unsigned N = sizeof(fixuint_t) * CHAR_BIT;
+  // d == 0 cases are unspecified.
+  unsigned sr = (d ? clz(d) : N) - (n ? clz(n) : N);
+  // 0 <= sr <= N - 1 or sr is very large.
+  if (sr > N - 1) // n < d
+    return n;
+  if (sr == N - 1) // d == 1
+    return 0;
+  ++sr;
+  // 1 <= sr <= N - 1. Shifts do not trigger UB.
+  fixuint_t r = n >> sr;
+  n <<= N - sr;
+  fixuint_t carry = 0;
+  for (; sr > 0; --sr) {
+    r = (r << 1) | (n >> (N - 1));
+    n = (n << 1) | carry;
+    // Branch-less version of:
+    // carry = 0;
+    // if (r >= d) r -= d, carry = 1;
+    const fixint_t s = (fixint_t)(d - r - 1) >> (N - 1);
+    carry = s & 1;
+    r -= d & s;
+  }
+  return r;
+}
+
+#undef __divXi3
+
+#ifdef COMPUTE_UDIV
+
+#define __divXi3 __divXi3_3
+
+static __inline fixint_t __divXi3(fixint_t a, fixint_t b) {
+  const int N = (int)(sizeof(fixint_t) * CHAR_BIT) - 1;
+  fixint_t s_a = a >> N;                            // s_a = a < 0 ? -1 : 0
+  fixint_t s_b = b >> N;                            // s_b = b < 0 ? -1 : 0
+  fixuint_t a_u = (fixuint_t)(a ^ s_a) + (-s_a);    // negate if s_a == -1
+  fixuint_t b_u = (fixuint_t)(b ^ s_b) + (-s_b);    // negate if s_b == -1
+  s_a ^= s_b;                                       // sign of quotient
+  return (COMPUTE_UDIV(a_u, b_u) ^ s_a) + (-s_a);   // negate if s_a == -1
+}
+#endif // COMPUTE_UDIV
+
+#undef __modXi3
+
+#ifdef ASSIGN_UMOD
+
+#define __modXi3 __modXi3_4
+
+static __inline fixint_t __modXi3(fixint_t a, fixint_t b) {
+  const int N = (int)(sizeof(fixint_t) * CHAR_BIT) - 1;
+  fixint_t s = b >> N;                              // s = b < 0 ? -1 : 0
+  fixuint_t b_u = (fixuint_t)(b ^ s) + (-s);        // negate if s == -1
+  s = a >> N;                                       // s = a < 0 ? -1 : 0
+  fixuint_t a_u = (fixuint_t)(a ^ s) + (-s);        // negate if s == -1
+  fixuint_t res;
+  ASSIGN_UMOD(res, a_u, b_u);
+  return (res ^ s) + (-s);                          // negate if s == -1
+}
+#endif // ASSIGN_UMOD
+
+#undef clz
+
+COMPILER_RT_ABI di_int __divdi3(di_int a, di_int b) { return __divXi3(a, b); }
+
+#undef fixint_t
+#undef fixuint_t
+#undef COMPUTE_UDIV
 //===-- divmoddi4.c - Implement __divmoddi4 -------------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -1307,24 +1418,138 @@ COMPILER_RT_ABI ti_int __divmodti4(ti_int a, ti_int b, ti_int *rem) {
 
 // Returns: a / b
 
+#define fixint_t si_int
+#define fixuint_t su_int
 // On CPUs without unsigned hardware division support,
 //  this calls __udivsi3 (notice the cast to su_int).
 // On CPUs with unsigned hardware division support,
 //  this uses the unsigned division instruction.
+#define COMPUTE_UDIV(a, b) ((su_int)(a) / (su_int)(b))
+//===-- int_div_impl.inc - Integer division ---------------------*- C++ -*-===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+// 2024/10/20 - Modified by mintsuki for use inside cc-runtime
+//
+//===----------------------------------------------------------------------===//
+//
+// Helpers used by __udivsi3, __umodsi3, __udivdi3, and __umodsi3.
+//
+//===----------------------------------------------------------------------===//
 
-COMPILER_RT_ABI si_int __divsi3(si_int a, si_int b) {
-  const int N = (int)(sizeof(si_int) * CHAR_BIT) - 1;
-  si_int s_a = a >> N;                            // s_a = a < 0 ? -1 : 0
-  si_int s_b = b >> N;                            // s_b = b < 0 ? -1 : 0
-  su_int a_u = (su_int)(a ^ s_a) + (-s_a);    // negate if s_a == -1
-  su_int b_u = (su_int)(b ^ s_b) + (-s_b);    // negate if s_b == -1
-  s_a ^= s_b;                                       // sign of quotient
-  return (((su_int)a_u / (su_int)b_u) ^ s_a) + (-s_a);   // negate if s_a == -1
+#define clz(a) (sizeof(a) == sizeof(unsigned long long) ? __builtin_clzll(a) : clzsi(a))
+
+#undef __udivXi3
+#define __udivXi3 __udivXi3_5
+
+// Adapted from Figure 3-40 of The PowerPC Compiler Writer's Guide
+static __inline fixuint_t __udivXi3(fixuint_t n, fixuint_t d) {
+  const unsigned N = sizeof(fixuint_t) * CHAR_BIT;
+  // d == 0 cases are unspecified.
+  unsigned sr = (d ? clz(d) : N) - (n ? clz(n) : N);
+  // 0 <= sr <= N - 1 or sr is very large.
+  if (sr > N - 1) // n < d
+    return 0;
+  if (sr == N - 1) // d == 1
+    return n;
+  ++sr;
+  // 1 <= sr <= N - 1. Shifts do not trigger UB.
+  fixuint_t r = n >> sr;
+  n <<= N - sr;
+  fixuint_t carry = 0;
+  for (; sr > 0; --sr) {
+    r = (r << 1) | (n >> (N - 1));
+    n = (n << 1) | carry;
+    // Branch-less version of:
+    // carry = 0;
+    // if (r >= d) r -= d, carry = 1;
+    const fixint_t s = (fixint_t)(d - r - 1) >> (N - 1);
+    carry = s & 1;
+    r -= d & s;
+  }
+  n = (n << 1) | carry;
+  return n;
 }
+
+#undef __umodXi3
+#define __umodXi3 __umodXi3_6
+
+// Mostly identical to __udivXi3 but the return values are different.
+static __inline fixuint_t __umodXi3(fixuint_t n, fixuint_t d) {
+  const unsigned N = sizeof(fixuint_t) * CHAR_BIT;
+  // d == 0 cases are unspecified.
+  unsigned sr = (d ? clz(d) : N) - (n ? clz(n) : N);
+  // 0 <= sr <= N - 1 or sr is very large.
+  if (sr > N - 1) // n < d
+    return n;
+  if (sr == N - 1) // d == 1
+    return 0;
+  ++sr;
+  // 1 <= sr <= N - 1. Shifts do not trigger UB.
+  fixuint_t r = n >> sr;
+  n <<= N - sr;
+  fixuint_t carry = 0;
+  for (; sr > 0; --sr) {
+    r = (r << 1) | (n >> (N - 1));
+    n = (n << 1) | carry;
+    // Branch-less version of:
+    // carry = 0;
+    // if (r >= d) r -= d, carry = 1;
+    const fixint_t s = (fixint_t)(d - r - 1) >> (N - 1);
+    carry = s & 1;
+    r -= d & s;
+  }
+  return r;
+}
+
+#undef __divXi3
+
+#ifdef COMPUTE_UDIV
+
+#define __divXi3 __divXi3_7
+
+static __inline fixint_t __divXi3(fixint_t a, fixint_t b) {
+  const int N = (int)(sizeof(fixint_t) * CHAR_BIT) - 1;
+  fixint_t s_a = a >> N;                            // s_a = a < 0 ? -1 : 0
+  fixint_t s_b = b >> N;                            // s_b = b < 0 ? -1 : 0
+  fixuint_t a_u = (fixuint_t)(a ^ s_a) + (-s_a);    // negate if s_a == -1
+  fixuint_t b_u = (fixuint_t)(b ^ s_b) + (-s_b);    // negate if s_b == -1
+  s_a ^= s_b;                                       // sign of quotient
+  return (COMPUTE_UDIV(a_u, b_u) ^ s_a) + (-s_a);   // negate if s_a == -1
+}
+#endif // COMPUTE_UDIV
+
+#undef __modXi3
+
+#ifdef ASSIGN_UMOD
+
+#define __modXi3 __modXi3_8
+
+static __inline fixint_t __modXi3(fixint_t a, fixint_t b) {
+  const int N = (int)(sizeof(fixint_t) * CHAR_BIT) - 1;
+  fixint_t s = b >> N;                              // s = b < 0 ? -1 : 0
+  fixuint_t b_u = (fixuint_t)(b ^ s) + (-s);        // negate if s == -1
+  s = a >> N;                                       // s = a < 0 ? -1 : 0
+  fixuint_t a_u = (fixuint_t)(a ^ s) + (-s);        // negate if s == -1
+  fixuint_t res;
+  ASSIGN_UMOD(res, a_u, b_u);
+  return (res ^ s) + (-s);                          // negate if s == -1
+}
+#endif // ASSIGN_UMOD
+
+#undef clz
+
+COMPILER_RT_ABI si_int __divsi3(si_int a, si_int b) { return __divXi3(a, b); }
 
 #if defined(__ARM_EABI__)
 COMPILER_RT_ALIAS(__divsi3, __aeabi_idiv)
 #endif
+
+#undef fixint_t
+#undef fixuint_t
+#undef COMPUTE_UDIV
 //===-- divti3.c - Implement __divti3 -------------------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -1344,15 +1569,130 @@ COMPILER_RT_ALIAS(__divsi3, __aeabi_idiv)
 
 // Returns: a / b
 
-COMPILER_RT_ABI ti_int __divti3(ti_int a, ti_int b) {
-  const int N = (int)(sizeof(ti_int) * CHAR_BIT) - 1;
-  ti_int s_a = a >> N;                            // s_a = a < 0 ? -1 : 0
-  ti_int s_b = b >> N;                            // s_b = b < 0 ? -1 : 0
-  tu_int a_u = (tu_int)(a ^ s_a) + (-s_a);    // negate if s_a == -1
-  tu_int b_u = (tu_int)(b ^ s_b) + (-s_b);    // negate if s_b == -1
-  s_a ^= s_b;                                       // sign of quotient
-  return (__udivmodti4(a_u, b_u, (tu_int *)0) ^ s_a) + (-s_a);   // negate if s_a == -1
+#define fixint_t ti_int
+#define fixuint_t tu_int
+#define COMPUTE_UDIV(a, b) __udivmodti4((a), (b), (tu_int *)0)
+//===-- int_div_impl.inc - Integer division ---------------------*- C++ -*-===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+// 2024/10/20 - Modified by mintsuki for use inside cc-runtime
+//
+//===----------------------------------------------------------------------===//
+//
+// Helpers used by __udivsi3, __umodsi3, __udivdi3, and __umodsi3.
+//
+//===----------------------------------------------------------------------===//
+
+#define clz(a) (sizeof(a) == sizeof(unsigned long long) ? __builtin_clzll(a) : clzsi(a))
+
+#undef __udivXi3
+#define __udivXi3 __udivXi3_9
+
+// Adapted from Figure 3-40 of The PowerPC Compiler Writer's Guide
+static __inline fixuint_t __udivXi3(fixuint_t n, fixuint_t d) {
+  const unsigned N = sizeof(fixuint_t) * CHAR_BIT;
+  // d == 0 cases are unspecified.
+  unsigned sr = (d ? clz(d) : N) - (n ? clz(n) : N);
+  // 0 <= sr <= N - 1 or sr is very large.
+  if (sr > N - 1) // n < d
+    return 0;
+  if (sr == N - 1) // d == 1
+    return n;
+  ++sr;
+  // 1 <= sr <= N - 1. Shifts do not trigger UB.
+  fixuint_t r = n >> sr;
+  n <<= N - sr;
+  fixuint_t carry = 0;
+  for (; sr > 0; --sr) {
+    r = (r << 1) | (n >> (N - 1));
+    n = (n << 1) | carry;
+    // Branch-less version of:
+    // carry = 0;
+    // if (r >= d) r -= d, carry = 1;
+    const fixint_t s = (fixint_t)(d - r - 1) >> (N - 1);
+    carry = s & 1;
+    r -= d & s;
+  }
+  n = (n << 1) | carry;
+  return n;
 }
+
+#undef __umodXi3
+#define __umodXi3 __umodXi3_10
+
+// Mostly identical to __udivXi3 but the return values are different.
+static __inline fixuint_t __umodXi3(fixuint_t n, fixuint_t d) {
+  const unsigned N = sizeof(fixuint_t) * CHAR_BIT;
+  // d == 0 cases are unspecified.
+  unsigned sr = (d ? clz(d) : N) - (n ? clz(n) : N);
+  // 0 <= sr <= N - 1 or sr is very large.
+  if (sr > N - 1) // n < d
+    return n;
+  if (sr == N - 1) // d == 1
+    return 0;
+  ++sr;
+  // 1 <= sr <= N - 1. Shifts do not trigger UB.
+  fixuint_t r = n >> sr;
+  n <<= N - sr;
+  fixuint_t carry = 0;
+  for (; sr > 0; --sr) {
+    r = (r << 1) | (n >> (N - 1));
+    n = (n << 1) | carry;
+    // Branch-less version of:
+    // carry = 0;
+    // if (r >= d) r -= d, carry = 1;
+    const fixint_t s = (fixint_t)(d - r - 1) >> (N - 1);
+    carry = s & 1;
+    r -= d & s;
+  }
+  return r;
+}
+
+#undef __divXi3
+
+#ifdef COMPUTE_UDIV
+
+#define __divXi3 __divXi3_11
+
+static __inline fixint_t __divXi3(fixint_t a, fixint_t b) {
+  const int N = (int)(sizeof(fixint_t) * CHAR_BIT) - 1;
+  fixint_t s_a = a >> N;                            // s_a = a < 0 ? -1 : 0
+  fixint_t s_b = b >> N;                            // s_b = b < 0 ? -1 : 0
+  fixuint_t a_u = (fixuint_t)(a ^ s_a) + (-s_a);    // negate if s_a == -1
+  fixuint_t b_u = (fixuint_t)(b ^ s_b) + (-s_b);    // negate if s_b == -1
+  s_a ^= s_b;                                       // sign of quotient
+  return (COMPUTE_UDIV(a_u, b_u) ^ s_a) + (-s_a);   // negate if s_a == -1
+}
+#endif // COMPUTE_UDIV
+
+#undef __modXi3
+
+#ifdef ASSIGN_UMOD
+
+#define __modXi3 __modXi3_12
+
+static __inline fixint_t __modXi3(fixint_t a, fixint_t b) {
+  const int N = (int)(sizeof(fixint_t) * CHAR_BIT) - 1;
+  fixint_t s = b >> N;                              // s = b < 0 ? -1 : 0
+  fixuint_t b_u = (fixuint_t)(b ^ s) + (-s);        // negate if s == -1
+  s = a >> N;                                       // s = a < 0 ? -1 : 0
+  fixuint_t a_u = (fixuint_t)(a ^ s) + (-s);        // negate if s == -1
+  fixuint_t res;
+  ASSIGN_UMOD(res, a_u, b_u);
+  return (res ^ s) + (-s);                          // negate if s == -1
+}
+#endif // ASSIGN_UMOD
+
+#undef clz
+
+COMPILER_RT_ABI ti_int __divti3(ti_int a, ti_int b) { return __divXi3(a, b); }
+
+#undef fixint_t
+#undef fixuint_t
+#undef COMPUTE_UDIV
 
 #endif // CRT_HAS_128BIT
 //===-- ffsdi2.c - Implement __ffsdi2 -------------------------------------===//
@@ -1555,16 +1895,130 @@ COMPILER_RT_ABI ti_int __lshrti3(ti_int a, int b) {
 
 // Returns: a % b
 
-COMPILER_RT_ABI di_int __moddi3(di_int a, di_int b) {
-  const int N = (int)(sizeof(di_int) * CHAR_BIT) - 1;
-  di_int s = b >> N;                              // s = b < 0 ? -1 : 0
-  du_int b_u = (du_int)(b ^ s) + (-s);        // negate if s == -1
+#define fixint_t di_int
+#define fixuint_t du_int
+#define ASSIGN_UMOD(res, a, b) __udivmoddi4((a), (b), &(res))
+//===-- int_div_impl.inc - Integer division ---------------------*- C++ -*-===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+// 2024/10/20 - Modified by mintsuki for use inside cc-runtime
+//
+//===----------------------------------------------------------------------===//
+//
+// Helpers used by __udivsi3, __umodsi3, __udivdi3, and __umodsi3.
+//
+//===----------------------------------------------------------------------===//
+
+#define clz(a) (sizeof(a) == sizeof(unsigned long long) ? __builtin_clzll(a) : clzsi(a))
+
+#undef __udivXi3
+#define __udivXi3 __udivXi3_13
+
+// Adapted from Figure 3-40 of The PowerPC Compiler Writer's Guide
+static __inline fixuint_t __udivXi3(fixuint_t n, fixuint_t d) {
+  const unsigned N = sizeof(fixuint_t) * CHAR_BIT;
+  // d == 0 cases are unspecified.
+  unsigned sr = (d ? clz(d) : N) - (n ? clz(n) : N);
+  // 0 <= sr <= N - 1 or sr is very large.
+  if (sr > N - 1) // n < d
+    return 0;
+  if (sr == N - 1) // d == 1
+    return n;
+  ++sr;
+  // 1 <= sr <= N - 1. Shifts do not trigger UB.
+  fixuint_t r = n >> sr;
+  n <<= N - sr;
+  fixuint_t carry = 0;
+  for (; sr > 0; --sr) {
+    r = (r << 1) | (n >> (N - 1));
+    n = (n << 1) | carry;
+    // Branch-less version of:
+    // carry = 0;
+    // if (r >= d) r -= d, carry = 1;
+    const fixint_t s = (fixint_t)(d - r - 1) >> (N - 1);
+    carry = s & 1;
+    r -= d & s;
+  }
+  n = (n << 1) | carry;
+  return n;
+}
+
+#undef __umodXi3
+#define __umodXi3 __umodXi3_14
+
+// Mostly identical to __udivXi3 but the return values are different.
+static __inline fixuint_t __umodXi3(fixuint_t n, fixuint_t d) {
+  const unsigned N = sizeof(fixuint_t) * CHAR_BIT;
+  // d == 0 cases are unspecified.
+  unsigned sr = (d ? clz(d) : N) - (n ? clz(n) : N);
+  // 0 <= sr <= N - 1 or sr is very large.
+  if (sr > N - 1) // n < d
+    return n;
+  if (sr == N - 1) // d == 1
+    return 0;
+  ++sr;
+  // 1 <= sr <= N - 1. Shifts do not trigger UB.
+  fixuint_t r = n >> sr;
+  n <<= N - sr;
+  fixuint_t carry = 0;
+  for (; sr > 0; --sr) {
+    r = (r << 1) | (n >> (N - 1));
+    n = (n << 1) | carry;
+    // Branch-less version of:
+    // carry = 0;
+    // if (r >= d) r -= d, carry = 1;
+    const fixint_t s = (fixint_t)(d - r - 1) >> (N - 1);
+    carry = s & 1;
+    r -= d & s;
+  }
+  return r;
+}
+
+#undef __divXi3
+
+#ifdef COMPUTE_UDIV
+
+#define __divXi3 __divXi3_15
+
+static __inline fixint_t __divXi3(fixint_t a, fixint_t b) {
+  const int N = (int)(sizeof(fixint_t) * CHAR_BIT) - 1;
+  fixint_t s_a = a >> N;                            // s_a = a < 0 ? -1 : 0
+  fixint_t s_b = b >> N;                            // s_b = b < 0 ? -1 : 0
+  fixuint_t a_u = (fixuint_t)(a ^ s_a) + (-s_a);    // negate if s_a == -1
+  fixuint_t b_u = (fixuint_t)(b ^ s_b) + (-s_b);    // negate if s_b == -1
+  s_a ^= s_b;                                       // sign of quotient
+  return (COMPUTE_UDIV(a_u, b_u) ^ s_a) + (-s_a);   // negate if s_a == -1
+}
+#endif // COMPUTE_UDIV
+
+#undef __modXi3
+
+#ifdef ASSIGN_UMOD
+
+#define __modXi3 __modXi3_16
+
+static __inline fixint_t __modXi3(fixint_t a, fixint_t b) {
+  const int N = (int)(sizeof(fixint_t) * CHAR_BIT) - 1;
+  fixint_t s = b >> N;                              // s = b < 0 ? -1 : 0
+  fixuint_t b_u = (fixuint_t)(b ^ s) + (-s);        // negate if s == -1
   s = a >> N;                                       // s = a < 0 ? -1 : 0
-  du_int a_u = (du_int)(a ^ s) + (-s);        // negate if s == -1
-  du_int res;
-  __udivmoddi4(a_u, b_u, &res);
+  fixuint_t a_u = (fixuint_t)(a ^ s) + (-s);        // negate if s == -1
+  fixuint_t res;
+  ASSIGN_UMOD(res, a_u, b_u);
   return (res ^ s) + (-s);                          // negate if s == -1
 }
+#endif // ASSIGN_UMOD
+
+#undef clz
+
+COMPILER_RT_ABI di_int __moddi3(di_int a, di_int b) { return __modXi3(a, b); }
+
+#undef fixint_t
+#undef fixuint_t
+#undef ASSIGN_UMOD
 //===-- modsi3.c - Implement __modsi3 -------------------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -1602,16 +2056,130 @@ COMPILER_RT_ABI si_int __modsi3(si_int a, si_int b) {
 
 // Returns: a % b
 
-COMPILER_RT_ABI ti_int __modti3(ti_int a, ti_int b) {
-  const int N = (int)(sizeof(ti_int) * CHAR_BIT) - 1;
-  ti_int s = b >> N;                              // s = b < 0 ? -1 : 0
-  tu_int b_u = (tu_int)(b ^ s) + (-s);        // negate if s == -1
+#define fixint_t ti_int
+#define fixuint_t tu_int
+#define ASSIGN_UMOD(res, a, b) __udivmodti4((a), (b), &(res))
+//===-- int_div_impl.inc - Integer division ---------------------*- C++ -*-===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+// 2024/10/20 - Modified by mintsuki for use inside cc-runtime
+//
+//===----------------------------------------------------------------------===//
+//
+// Helpers used by __udivsi3, __umodsi3, __udivdi3, and __umodsi3.
+//
+//===----------------------------------------------------------------------===//
+
+#define clz(a) (sizeof(a) == sizeof(unsigned long long) ? __builtin_clzll(a) : clzsi(a))
+
+#undef __udivXi3
+#define __udivXi3 __udivXi3_17
+
+// Adapted from Figure 3-40 of The PowerPC Compiler Writer's Guide
+static __inline fixuint_t __udivXi3(fixuint_t n, fixuint_t d) {
+  const unsigned N = sizeof(fixuint_t) * CHAR_BIT;
+  // d == 0 cases are unspecified.
+  unsigned sr = (d ? clz(d) : N) - (n ? clz(n) : N);
+  // 0 <= sr <= N - 1 or sr is very large.
+  if (sr > N - 1) // n < d
+    return 0;
+  if (sr == N - 1) // d == 1
+    return n;
+  ++sr;
+  // 1 <= sr <= N - 1. Shifts do not trigger UB.
+  fixuint_t r = n >> sr;
+  n <<= N - sr;
+  fixuint_t carry = 0;
+  for (; sr > 0; --sr) {
+    r = (r << 1) | (n >> (N - 1));
+    n = (n << 1) | carry;
+    // Branch-less version of:
+    // carry = 0;
+    // if (r >= d) r -= d, carry = 1;
+    const fixint_t s = (fixint_t)(d - r - 1) >> (N - 1);
+    carry = s & 1;
+    r -= d & s;
+  }
+  n = (n << 1) | carry;
+  return n;
+}
+
+#undef __umodXi3
+#define __umodXi3 __umodXi3_18
+
+// Mostly identical to __udivXi3 but the return values are different.
+static __inline fixuint_t __umodXi3(fixuint_t n, fixuint_t d) {
+  const unsigned N = sizeof(fixuint_t) * CHAR_BIT;
+  // d == 0 cases are unspecified.
+  unsigned sr = (d ? clz(d) : N) - (n ? clz(n) : N);
+  // 0 <= sr <= N - 1 or sr is very large.
+  if (sr > N - 1) // n < d
+    return n;
+  if (sr == N - 1) // d == 1
+    return 0;
+  ++sr;
+  // 1 <= sr <= N - 1. Shifts do not trigger UB.
+  fixuint_t r = n >> sr;
+  n <<= N - sr;
+  fixuint_t carry = 0;
+  for (; sr > 0; --sr) {
+    r = (r << 1) | (n >> (N - 1));
+    n = (n << 1) | carry;
+    // Branch-less version of:
+    // carry = 0;
+    // if (r >= d) r -= d, carry = 1;
+    const fixint_t s = (fixint_t)(d - r - 1) >> (N - 1);
+    carry = s & 1;
+    r -= d & s;
+  }
+  return r;
+}
+
+#undef __divXi3
+
+#ifdef COMPUTE_UDIV
+
+#define __divXi3 __divXi3_19
+
+static __inline fixint_t __divXi3(fixint_t a, fixint_t b) {
+  const int N = (int)(sizeof(fixint_t) * CHAR_BIT) - 1;
+  fixint_t s_a = a >> N;                            // s_a = a < 0 ? -1 : 0
+  fixint_t s_b = b >> N;                            // s_b = b < 0 ? -1 : 0
+  fixuint_t a_u = (fixuint_t)(a ^ s_a) + (-s_a);    // negate if s_a == -1
+  fixuint_t b_u = (fixuint_t)(b ^ s_b) + (-s_b);    // negate if s_b == -1
+  s_a ^= s_b;                                       // sign of quotient
+  return (COMPUTE_UDIV(a_u, b_u) ^ s_a) + (-s_a);   // negate if s_a == -1
+}
+#endif // COMPUTE_UDIV
+
+#undef __modXi3
+
+#ifdef ASSIGN_UMOD
+
+#define __modXi3 __modXi3_20
+
+static __inline fixint_t __modXi3(fixint_t a, fixint_t b) {
+  const int N = (int)(sizeof(fixint_t) * CHAR_BIT) - 1;
+  fixint_t s = b >> N;                              // s = b < 0 ? -1 : 0
+  fixuint_t b_u = (fixuint_t)(b ^ s) + (-s);        // negate if s == -1
   s = a >> N;                                       // s = a < 0 ? -1 : 0
-  tu_int a_u = (tu_int)(a ^ s) + (-s);        // negate if s == -1
-  tu_int res;
-  __udivmodti4(a_u, b_u, &res);
+  fixuint_t a_u = (fixuint_t)(a ^ s) + (-s);        // negate if s == -1
+  fixuint_t res;
+  ASSIGN_UMOD(res, a_u, b_u);
   return (res ^ s) + (-s);                          // negate if s == -1
 }
+#endif // ASSIGN_UMOD
+
+#undef clz
+
+COMPILER_RT_ABI ti_int __modti3(ti_int a, ti_int b) { return __modXi3(a, b); }
+
+#undef fixint_t
+#undef fixuint_t
+#undef ASSIGN_UMOD
 
 #endif // CRT_HAS_128BIT
 //===-- muldi3.c - Implement __muldi3 -------------------------------------===//
@@ -1678,17 +2246,36 @@ COMPILER_RT_ALIAS(__muldi3, __aeabi_lmul)
 //
 //===----------------------------------------------------------------------===//
 
+#define fixint_t di_int
+#define fixuint_t du_int
+//===-- int_mulo_impl.inc - Implement __mulo[sdt]i4 ---------------*- C -*-===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+// 2024/10/20 - Modified by mintsuki for use inside cc-runtime
+//
+//===----------------------------------------------------------------------===//
+//
+// Helper used by __mulosi4, __mulodi4 and __muloti4.
+//
+//===----------------------------------------------------------------------===//
+
 
 // Returns: a * b
 
 // Effects: sets *overflow to 1  if a * b overflows
 
-COMPILER_RT_ABI di_int __mulodi4(di_int a, di_int b, int *overflow) {
-  const int N = (int)(sizeof(di_int) * CHAR_BIT);
-  const di_int MIN = (di_int)((du_int)1 << (N - 1));
-  const di_int MAX = ~MIN;
+#undef __muloXi4
+#define __muloXi4 __muloXi4_21
+
+static __inline fixint_t __muloXi4(fixint_t a, fixint_t b, int *overflow) {
+  const int N = (int)(sizeof(fixint_t) * CHAR_BIT);
+  const fixint_t MIN = (fixint_t)((fixuint_t)1 << (N - 1));
+  const fixint_t MAX = ~MIN;
   *overflow = 0;
-  di_int result = (du_int)a * b;
+  fixint_t result = (fixuint_t)a * b;
   if (a == MIN) {
     if (b != 0 && b != 1)
       *overflow = 1;
@@ -1699,10 +2286,10 @@ COMPILER_RT_ABI di_int __mulodi4(di_int a, di_int b, int *overflow) {
       *overflow = 1;
     return result;
   }
-  di_int sa = a >> (N - 1);
-  di_int abs_a = (a ^ sa) - sa;
-  di_int sb = b >> (N - 1);
-  di_int abs_b = (b ^ sb) - sb;
+  fixint_t sa = a >> (N - 1);
+  fixint_t abs_a = (a ^ sa) - sa;
+  fixint_t sb = b >> (N - 1);
+  fixint_t abs_b = (b ^ sb) - sb;
   if (abs_a < 2 || abs_b < 2)
     return result;
   if (sa == sb) {
@@ -1714,6 +2301,17 @@ COMPILER_RT_ABI di_int __mulodi4(di_int a, di_int b, int *overflow) {
   }
   return result;
 }
+
+// Returns: a * b
+
+// Effects: sets *overflow to 1  if a * b overflows
+
+COMPILER_RT_ABI di_int __mulodi4(di_int a, di_int b, int *overflow) {
+  return __muloXi4(a, b, overflow);
+}
+
+#undef fixint_t
+#undef fixuint_t
 //===-- mulosi4.c - Implement __mulosi4 -----------------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -1728,17 +2326,36 @@ COMPILER_RT_ABI di_int __mulodi4(di_int a, di_int b, int *overflow) {
 //
 //===----------------------------------------------------------------------===//
 
+#define fixint_t si_int
+#define fixuint_t su_int
+//===-- int_mulo_impl.inc - Implement __mulo[sdt]i4 ---------------*- C -*-===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+// 2024/10/20 - Modified by mintsuki for use inside cc-runtime
+//
+//===----------------------------------------------------------------------===//
+//
+// Helper used by __mulosi4, __mulodi4 and __muloti4.
+//
+//===----------------------------------------------------------------------===//
+
 
 // Returns: a * b
 
 // Effects: sets *overflow to 1  if a * b overflows
 
-COMPILER_RT_ABI si_int __mulosi4(si_int a, si_int b, int *overflow) {
-  const int N = (int)(sizeof(si_int) * CHAR_BIT);
-  const si_int MIN = (si_int)((su_int)1 << (N - 1));
-  const si_int MAX = ~MIN;
+#undef __muloXi4
+#define __muloXi4 __muloXi4_22
+
+static __inline fixint_t __muloXi4(fixint_t a, fixint_t b, int *overflow) {
+  const int N = (int)(sizeof(fixint_t) * CHAR_BIT);
+  const fixint_t MIN = (fixint_t)((fixuint_t)1 << (N - 1));
+  const fixint_t MAX = ~MIN;
   *overflow = 0;
-  si_int result = (su_int)a * b;
+  fixint_t result = (fixuint_t)a * b;
   if (a == MIN) {
     if (b != 0 && b != 1)
       *overflow = 1;
@@ -1749,10 +2366,10 @@ COMPILER_RT_ABI si_int __mulosi4(si_int a, si_int b, int *overflow) {
       *overflow = 1;
     return result;
   }
-  si_int sa = a >> (N - 1);
-  si_int abs_a = (a ^ sa) - sa;
-  si_int sb = b >> (N - 1);
-  si_int abs_b = (b ^ sb) - sb;
+  fixint_t sa = a >> (N - 1);
+  fixint_t abs_a = (a ^ sa) - sa;
+  fixint_t sb = b >> (N - 1);
+  fixint_t abs_b = (b ^ sb) - sb;
   if (abs_a < 2 || abs_b < 2)
     return result;
   if (sa == sb) {
@@ -1764,6 +2381,17 @@ COMPILER_RT_ABI si_int __mulosi4(si_int a, si_int b, int *overflow) {
   }
   return result;
 }
+
+// Returns: a * b
+
+// Effects: sets *overflow to 1  if a * b overflows
+
+COMPILER_RT_ABI si_int __mulosi4(si_int a, si_int b, int *overflow) {
+  return __muloXi4(a, b, overflow);
+}
+
+#undef fixint_t
+#undef fixuint_t
 //===-- muloti4.c - Implement __muloti4 -----------------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -1785,12 +2413,36 @@ COMPILER_RT_ABI si_int __mulosi4(si_int a, si_int b, int *overflow) {
 
 // Effects: sets *overflow to 1  if a * b overflows
 
-COMPILER_RT_ABI ti_int __muloti4(ti_int a, ti_int b, int *overflow) {
-  const int N = (int)(sizeof(ti_int) * CHAR_BIT);
-  const ti_int MIN = (ti_int)((tu_int)1 << (N - 1));
-  const ti_int MAX = ~MIN;
+#define fixint_t ti_int
+#define fixuint_t tu_int
+//===-- int_mulo_impl.inc - Implement __mulo[sdt]i4 ---------------*- C -*-===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+// 2024/10/20 - Modified by mintsuki for use inside cc-runtime
+//
+//===----------------------------------------------------------------------===//
+//
+// Helper used by __mulosi4, __mulodi4 and __muloti4.
+//
+//===----------------------------------------------------------------------===//
+
+
+// Returns: a * b
+
+// Effects: sets *overflow to 1  if a * b overflows
+
+#undef __muloXi4
+#define __muloXi4 __muloXi4_23
+
+static __inline fixint_t __muloXi4(fixint_t a, fixint_t b, int *overflow) {
+  const int N = (int)(sizeof(fixint_t) * CHAR_BIT);
+  const fixint_t MIN = (fixint_t)((fixuint_t)1 << (N - 1));
+  const fixint_t MAX = ~MIN;
   *overflow = 0;
-  ti_int result = (tu_int)a * b;
+  fixint_t result = (fixuint_t)a * b;
   if (a == MIN) {
     if (b != 0 && b != 1)
       *overflow = 1;
@@ -1801,10 +2453,10 @@ COMPILER_RT_ABI ti_int __muloti4(ti_int a, ti_int b, int *overflow) {
       *overflow = 1;
     return result;
   }
-  ti_int sa = a >> (N - 1);
-  ti_int abs_a = (a ^ sa) - sa;
-  ti_int sb = b >> (N - 1);
-  ti_int abs_b = (b ^ sb) - sb;
+  fixint_t sa = a >> (N - 1);
+  fixint_t abs_a = (a ^ sa) - sa;
+  fixint_t sb = b >> (N - 1);
+  fixint_t abs_b = (b ^ sb) - sb;
   if (abs_a < 2 || abs_b < 2)
     return result;
   if (sa == sb) {
@@ -1816,6 +2468,13 @@ COMPILER_RT_ABI ti_int __muloti4(ti_int a, ti_int b, int *overflow) {
   }
   return result;
 }
+
+COMPILER_RT_ABI ti_int __muloti4(ti_int a, ti_int b, int *overflow) {
+  return __muloXi4(a, b, overflow);
+}
+
+#undef fixint_t
+#undef fixuint_t
 
 #endif // CRT_HAS_128BIT
 //===-- multi3.c - Implement __multi3 -------------------------------------===//
@@ -1882,15 +2541,34 @@ COMPILER_RT_ABI ti_int __multi3(ti_int a, ti_int b) {
 //
 //===----------------------------------------------------------------------===//
 
+#define fixint_t di_int
+#define fixuint_t du_int
+//===-- int_mulv_impl.inc - Implement __mulv[sdt]i3 ---------------*- C -*-===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+// 2024/10/20 - Modified by mintsuki for use inside cc-runtime
+//
+//===----------------------------------------------------------------------===//
+//
+// Helper used by __mulvsi3, __mulvdi3 and __mulvti3.
+//
+//===----------------------------------------------------------------------===//
+
 
 // Returns: a * b
 
 // Effects: aborts if a * b overflows
 
-COMPILER_RT_ABI di_int __mulvdi3(di_int a, di_int b) {
-  const int N = (int)(sizeof(di_int) * CHAR_BIT);
-  const di_int MIN = (di_int)((du_int)1 << (N - 1));
-  const di_int MAX = ~MIN;
+#undef __mulvXi3
+#define __mulvXi3 __mulvXi3_24
+
+static __inline fixint_t __mulvXi3(fixint_t a, fixint_t b) {
+  const int N = (int)(sizeof(fixint_t) * CHAR_BIT);
+  const fixint_t MIN = (fixint_t)((fixuint_t)1 << (N - 1));
+  const fixint_t MAX = ~MIN;
   if (a == MIN) {
     if (b == 0 || b == 1)
       return a * b;
@@ -1901,10 +2579,10 @@ COMPILER_RT_ABI di_int __mulvdi3(di_int a, di_int b) {
       return a * b;
     compilerrt_abort();
   }
-  di_int sa = a >> (N - 1);
-  di_int abs_a = (a ^ sa) - sa;
-  di_int sb = b >> (N - 1);
-  di_int abs_b = (b ^ sb) - sb;
+  fixint_t sa = a >> (N - 1);
+  fixint_t abs_a = (a ^ sa) - sa;
+  fixint_t sb = b >> (N - 1);
+  fixint_t abs_b = (b ^ sb) - sb;
   if (abs_a < 2 || abs_b < 2)
     return a * b;
   if (sa == sb) {
@@ -1916,6 +2594,15 @@ COMPILER_RT_ABI di_int __mulvdi3(di_int a, di_int b) {
   }
   return a * b;
 }
+
+// Returns: a * b
+
+// Effects: aborts if a * b overflows
+
+COMPILER_RT_ABI di_int __mulvdi3(di_int a, di_int b) { return __mulvXi3(a, b); }
+
+#undef fixint_t
+#undef fixuint_t
 //===-- mulvsi3.c - Implement __mulvsi3 -----------------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -1930,15 +2617,34 @@ COMPILER_RT_ABI di_int __mulvdi3(di_int a, di_int b) {
 //
 //===----------------------------------------------------------------------===//
 
+#define fixint_t si_int
+#define fixuint_t su_int
+//===-- int_mulv_impl.inc - Implement __mulv[sdt]i3 ---------------*- C -*-===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+// 2024/10/20 - Modified by mintsuki for use inside cc-runtime
+//
+//===----------------------------------------------------------------------===//
+//
+// Helper used by __mulvsi3, __mulvdi3 and __mulvti3.
+//
+//===----------------------------------------------------------------------===//
+
 
 // Returns: a * b
 
 // Effects: aborts if a * b overflows
 
-COMPILER_RT_ABI si_int __mulvsi3(si_int a, si_int b) {
-  const int N = (int)(sizeof(si_int) * CHAR_BIT);
-  const si_int MIN = (si_int)((su_int)1 << (N - 1));
-  const si_int MAX = ~MIN;
+#undef __mulvXi3
+#define __mulvXi3 __mulvXi3_25
+
+static __inline fixint_t __mulvXi3(fixint_t a, fixint_t b) {
+  const int N = (int)(sizeof(fixint_t) * CHAR_BIT);
+  const fixint_t MIN = (fixint_t)((fixuint_t)1 << (N - 1));
+  const fixint_t MAX = ~MIN;
   if (a == MIN) {
     if (b == 0 || b == 1)
       return a * b;
@@ -1949,10 +2655,10 @@ COMPILER_RT_ABI si_int __mulvsi3(si_int a, si_int b) {
       return a * b;
     compilerrt_abort();
   }
-  si_int sa = a >> (N - 1);
-  si_int abs_a = (a ^ sa) - sa;
-  si_int sb = b >> (N - 1);
-  si_int abs_b = (b ^ sb) - sb;
+  fixint_t sa = a >> (N - 1);
+  fixint_t abs_a = (a ^ sa) - sa;
+  fixint_t sb = b >> (N - 1);
+  fixint_t abs_b = (b ^ sb) - sb;
   if (abs_a < 2 || abs_b < 2)
     return a * b;
   if (sa == sb) {
@@ -1964,6 +2670,15 @@ COMPILER_RT_ABI si_int __mulvsi3(si_int a, si_int b) {
   }
   return a * b;
 }
+
+// Returns: a * b
+
+// Effects: aborts if a * b overflows
+
+COMPILER_RT_ABI si_int __mulvsi3(si_int a, si_int b) { return __mulvXi3(a, b); }
+
+#undef fixint_t
+#undef fixuint_t
 //===-- mulvti3.c - Implement __mulvti3 -----------------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -1985,10 +2700,34 @@ COMPILER_RT_ABI si_int __mulvsi3(si_int a, si_int b) {
 
 // Effects: aborts if a * b overflows
 
-COMPILER_RT_ABI ti_int __mulvti3(ti_int a, ti_int b) {
-  const int N = (int)(sizeof(ti_int) * CHAR_BIT);
-  const ti_int MIN = (ti_int)((tu_int)1 << (N - 1));
-  const ti_int MAX = ~MIN;
+#define fixint_t ti_int
+#define fixuint_t tu_int
+//===-- int_mulv_impl.inc - Implement __mulv[sdt]i3 ---------------*- C -*-===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+// 2024/10/20 - Modified by mintsuki for use inside cc-runtime
+//
+//===----------------------------------------------------------------------===//
+//
+// Helper used by __mulvsi3, __mulvdi3 and __mulvti3.
+//
+//===----------------------------------------------------------------------===//
+
+
+// Returns: a * b
+
+// Effects: aborts if a * b overflows
+
+#undef __mulvXi3
+#define __mulvXi3 __mulvXi3_26
+
+static __inline fixint_t __mulvXi3(fixint_t a, fixint_t b) {
+  const int N = (int)(sizeof(fixint_t) * CHAR_BIT);
+  const fixint_t MIN = (fixint_t)((fixuint_t)1 << (N - 1));
+  const fixint_t MAX = ~MIN;
   if (a == MIN) {
     if (b == 0 || b == 1)
       return a * b;
@@ -1999,10 +2738,10 @@ COMPILER_RT_ABI ti_int __mulvti3(ti_int a, ti_int b) {
       return a * b;
     compilerrt_abort();
   }
-  ti_int sa = a >> (N - 1);
-  ti_int abs_a = (a ^ sa) - sa;
-  ti_int sb = b >> (N - 1);
-  ti_int abs_b = (b ^ sb) - sb;
+  fixint_t sa = a >> (N - 1);
+  fixint_t abs_a = (a ^ sa) - sa;
+  fixint_t sb = b >> (N - 1);
+  fixint_t abs_b = (b ^ sb) - sb;
   if (abs_a < 2 || abs_b < 2)
     return a * b;
   if (sa == sb) {
@@ -2014,6 +2753,11 @@ COMPILER_RT_ABI ti_int __mulvti3(ti_int a, ti_int b) {
   }
   return a * b;
 }
+
+COMPILER_RT_ABI ti_int __mulvti3(ti_int a, ti_int b) { return __mulvXi3(a, b); }
+
+#undef fixint_t
+#undef fixuint_t
 
 #endif // CRT_HAS_128BIT
 //===-- negdi2.c - Implement __negdi2 -------------------------------------===//
@@ -2492,16 +3236,30 @@ COMPILER_RT_ABI si_int __ucmpti2(tu_int a, tu_int b) {
 //===----------------------------------------------------------------------===//
 
 
-// Returns: a / b
+#define fixuint_t du_int
+#define fixint_t di_int
+//===-- int_div_impl.inc - Integer division ---------------------*- C++ -*-===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+// 2024/10/20 - Modified by mintsuki for use inside cc-runtime
+//
+//===----------------------------------------------------------------------===//
+//
+// Helpers used by __udivsi3, __umodsi3, __udivdi3, and __umodsi3.
+//
+//===----------------------------------------------------------------------===//
 
-#ifdef clz
-#undef clz
-#endif
 #define clz(a) (sizeof(a) == sizeof(unsigned long long) ? __builtin_clzll(a) : clzsi(a))
 
+#undef __udivXi3
+#define __udivXi3 __udivXi3_27
+
 // Adapted from Figure 3-40 of The PowerPC Compiler Writer's Guide
-COMPILER_RT_ABI du_int __udivdi3(du_int n, du_int d) {
-  const unsigned N = sizeof(du_int) * CHAR_BIT;
+static __inline fixuint_t __udivXi3(fixuint_t n, fixuint_t d) {
+  const unsigned N = sizeof(fixuint_t) * CHAR_BIT;
   // d == 0 cases are unspecified.
   unsigned sr = (d ? clz(d) : N) - (n ? clz(n) : N);
   // 0 <= sr <= N - 1 or sr is very large.
@@ -2511,16 +3269,16 @@ COMPILER_RT_ABI du_int __udivdi3(du_int n, du_int d) {
     return n;
   ++sr;
   // 1 <= sr <= N - 1. Shifts do not trigger UB.
-  du_int r = n >> sr;
+  fixuint_t r = n >> sr;
   n <<= N - sr;
-  du_int carry = 0;
+  fixuint_t carry = 0;
   for (; sr > 0; --sr) {
     r = (r << 1) | (n >> (N - 1));
     n = (n << 1) | carry;
     // Branch-less version of:
     // carry = 0;
     // if (r >= d) r -= d, carry = 1;
-    const di_int s = (di_int)(d - r - 1) >> (N - 1);
+    const fixint_t s = (fixint_t)(d - r - 1) >> (N - 1);
     carry = s & 1;
     r -= d & s;
   }
@@ -2528,7 +3286,82 @@ COMPILER_RT_ABI du_int __udivdi3(du_int n, du_int d) {
   return n;
 }
 
+#undef __umodXi3
+#define __umodXi3 __umodXi3_28
+
+// Mostly identical to __udivXi3 but the return values are different.
+static __inline fixuint_t __umodXi3(fixuint_t n, fixuint_t d) {
+  const unsigned N = sizeof(fixuint_t) * CHAR_BIT;
+  // d == 0 cases are unspecified.
+  unsigned sr = (d ? clz(d) : N) - (n ? clz(n) : N);
+  // 0 <= sr <= N - 1 or sr is very large.
+  if (sr > N - 1) // n < d
+    return n;
+  if (sr == N - 1) // d == 1
+    return 0;
+  ++sr;
+  // 1 <= sr <= N - 1. Shifts do not trigger UB.
+  fixuint_t r = n >> sr;
+  n <<= N - sr;
+  fixuint_t carry = 0;
+  for (; sr > 0; --sr) {
+    r = (r << 1) | (n >> (N - 1));
+    n = (n << 1) | carry;
+    // Branch-less version of:
+    // carry = 0;
+    // if (r >= d) r -= d, carry = 1;
+    const fixint_t s = (fixint_t)(d - r - 1) >> (N - 1);
+    carry = s & 1;
+    r -= d & s;
+  }
+  return r;
+}
+
+#undef __divXi3
+
+#ifdef COMPUTE_UDIV
+
+#define __divXi3 __divXi3_29
+
+static __inline fixint_t __divXi3(fixint_t a, fixint_t b) {
+  const int N = (int)(sizeof(fixint_t) * CHAR_BIT) - 1;
+  fixint_t s_a = a >> N;                            // s_a = a < 0 ? -1 : 0
+  fixint_t s_b = b >> N;                            // s_b = b < 0 ? -1 : 0
+  fixuint_t a_u = (fixuint_t)(a ^ s_a) + (-s_a);    // negate if s_a == -1
+  fixuint_t b_u = (fixuint_t)(b ^ s_b) + (-s_b);    // negate if s_b == -1
+  s_a ^= s_b;                                       // sign of quotient
+  return (COMPUTE_UDIV(a_u, b_u) ^ s_a) + (-s_a);   // negate if s_a == -1
+}
+#endif // COMPUTE_UDIV
+
+#undef __modXi3
+
+#ifdef ASSIGN_UMOD
+
+#define __modXi3 __modXi3_30
+
+static __inline fixint_t __modXi3(fixint_t a, fixint_t b) {
+  const int N = (int)(sizeof(fixint_t) * CHAR_BIT) - 1;
+  fixint_t s = b >> N;                              // s = b < 0 ? -1 : 0
+  fixuint_t b_u = (fixuint_t)(b ^ s) + (-s);        // negate if s == -1
+  s = a >> N;                                       // s = a < 0 ? -1 : 0
+  fixuint_t a_u = (fixuint_t)(a ^ s) + (-s);        // negate if s == -1
+  fixuint_t res;
+  ASSIGN_UMOD(res, a_u, b_u);
+  return (res ^ s) + (-s);                          // negate if s == -1
+}
+#endif // ASSIGN_UMOD
+
 #undef clz
+
+// Returns: a / b
+
+COMPILER_RT_ABI du_int __udivdi3(du_int a, du_int b) {
+  return __udivXi3(a, b);
+}
+
+#undef fixuint_t
+#undef fixint_t
 //===-- udivmoddi4.c - Implement __udivmoddi4 -----------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -2911,16 +3744,30 @@ COMPILER_RT_ABI tu_int __udivmodti4(tu_int a, tu_int b, tu_int *rem) {
 //===----------------------------------------------------------------------===//
 
 
-// Returns: a / b
+#define fixuint_t su_int
+#define fixint_t si_int
+//===-- int_div_impl.inc - Integer division ---------------------*- C++ -*-===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+// 2024/10/20 - Modified by mintsuki for use inside cc-runtime
+//
+//===----------------------------------------------------------------------===//
+//
+// Helpers used by __udivsi3, __umodsi3, __udivdi3, and __umodsi3.
+//
+//===----------------------------------------------------------------------===//
 
-#ifdef clz
-#undef clz
-#endif
 #define clz(a) (sizeof(a) == sizeof(unsigned long long) ? __builtin_clzll(a) : clzsi(a))
 
+#undef __udivXi3
+#define __udivXi3 __udivXi3_31
+
 // Adapted from Figure 3-40 of The PowerPC Compiler Writer's Guide
-COMPILER_RT_ABI su_int __udivsi3(su_int n, su_int d) {
-  const unsigned N = sizeof(su_int) * CHAR_BIT;
+static __inline fixuint_t __udivXi3(fixuint_t n, fixuint_t d) {
+  const unsigned N = sizeof(fixuint_t) * CHAR_BIT;
   // d == 0 cases are unspecified.
   unsigned sr = (d ? clz(d) : N) - (n ? clz(n) : N);
   // 0 <= sr <= N - 1 or sr is very large.
@@ -2930,16 +3777,16 @@ COMPILER_RT_ABI su_int __udivsi3(su_int n, su_int d) {
     return n;
   ++sr;
   // 1 <= sr <= N - 1. Shifts do not trigger UB.
-  su_int r = n >> sr;
+  fixuint_t r = n >> sr;
   n <<= N - sr;
-  su_int carry = 0;
+  fixuint_t carry = 0;
   for (; sr > 0; --sr) {
     r = (r << 1) | (n >> (N - 1));
     n = (n << 1) | carry;
     // Branch-less version of:
     // carry = 0;
     // if (r >= d) r -= d, carry = 1;
-    const si_int s = (si_int)(d - r - 1) >> (N - 1);
+    const fixint_t s = (fixint_t)(d - r - 1) >> (N - 1);
     carry = s & 1;
     r -= d & s;
   }
@@ -2947,11 +3794,86 @@ COMPILER_RT_ABI su_int __udivsi3(su_int n, su_int d) {
   return n;
 }
 
+#undef __umodXi3
+#define __umodXi3 __umodXi3_32
+
+// Mostly identical to __udivXi3 but the return values are different.
+static __inline fixuint_t __umodXi3(fixuint_t n, fixuint_t d) {
+  const unsigned N = sizeof(fixuint_t) * CHAR_BIT;
+  // d == 0 cases are unspecified.
+  unsigned sr = (d ? clz(d) : N) - (n ? clz(n) : N);
+  // 0 <= sr <= N - 1 or sr is very large.
+  if (sr > N - 1) // n < d
+    return n;
+  if (sr == N - 1) // d == 1
+    return 0;
+  ++sr;
+  // 1 <= sr <= N - 1. Shifts do not trigger UB.
+  fixuint_t r = n >> sr;
+  n <<= N - sr;
+  fixuint_t carry = 0;
+  for (; sr > 0; --sr) {
+    r = (r << 1) | (n >> (N - 1));
+    n = (n << 1) | carry;
+    // Branch-less version of:
+    // carry = 0;
+    // if (r >= d) r -= d, carry = 1;
+    const fixint_t s = (fixint_t)(d - r - 1) >> (N - 1);
+    carry = s & 1;
+    r -= d & s;
+  }
+  return r;
+}
+
+#undef __divXi3
+
+#ifdef COMPUTE_UDIV
+
+#define __divXi3 __divXi3_33
+
+static __inline fixint_t __divXi3(fixint_t a, fixint_t b) {
+  const int N = (int)(sizeof(fixint_t) * CHAR_BIT) - 1;
+  fixint_t s_a = a >> N;                            // s_a = a < 0 ? -1 : 0
+  fixint_t s_b = b >> N;                            // s_b = b < 0 ? -1 : 0
+  fixuint_t a_u = (fixuint_t)(a ^ s_a) + (-s_a);    // negate if s_a == -1
+  fixuint_t b_u = (fixuint_t)(b ^ s_b) + (-s_b);    // negate if s_b == -1
+  s_a ^= s_b;                                       // sign of quotient
+  return (COMPUTE_UDIV(a_u, b_u) ^ s_a) + (-s_a);   // negate if s_a == -1
+}
+#endif // COMPUTE_UDIV
+
+#undef __modXi3
+
+#ifdef ASSIGN_UMOD
+
+#define __modXi3 __modXi3_34
+
+static __inline fixint_t __modXi3(fixint_t a, fixint_t b) {
+  const int N = (int)(sizeof(fixint_t) * CHAR_BIT) - 1;
+  fixint_t s = b >> N;                              // s = b < 0 ? -1 : 0
+  fixuint_t b_u = (fixuint_t)(b ^ s) + (-s);        // negate if s == -1
+  s = a >> N;                                       // s = a < 0 ? -1 : 0
+  fixuint_t a_u = (fixuint_t)(a ^ s) + (-s);        // negate if s == -1
+  fixuint_t res;
+  ASSIGN_UMOD(res, a_u, b_u);
+  return (res ^ s) + (-s);                          // negate if s == -1
+}
+#endif // ASSIGN_UMOD
+
 #undef clz
+
+// Returns: a / b
+
+COMPILER_RT_ABI su_int __udivsi3(su_int a, su_int b) {
+  return __udivXi3(a, b);
+}
 
 #if defined(__ARM_EABI__)
 COMPILER_RT_ALIAS(__udivsi3, __aeabi_uidiv)
 #endif
+
+#undef fixuint_t
+#undef fixint_t
 //===-- udivti3.c - Implement __udivti3 -----------------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -2989,16 +3911,62 @@ COMPILER_RT_ABI tu_int __udivti3(tu_int a, tu_int b) {
 //===----------------------------------------------------------------------===//
 
 
-// Returns: a % b
+#define fixuint_t du_int
+#define fixint_t di_int
+//===-- int_div_impl.inc - Integer division ---------------------*- C++ -*-===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+// 2024/10/20 - Modified by mintsuki for use inside cc-runtime
+//
+//===----------------------------------------------------------------------===//
+//
+// Helpers used by __udivsi3, __umodsi3, __udivdi3, and __umodsi3.
+//
+//===----------------------------------------------------------------------===//
 
-#ifdef clz
-#undef clz
-#endif
 #define clz(a) (sizeof(a) == sizeof(unsigned long long) ? __builtin_clzll(a) : clzsi(a))
 
-// Mostly identical to __udivdi3 but the return values are different.
-COMPILER_RT_ABI du_int __umoddi3(du_int n, du_int d) {
-  const unsigned N = sizeof(du_int) * CHAR_BIT;
+#undef __udivXi3
+#define __udivXi3 __udivXi3_35
+
+// Adapted from Figure 3-40 of The PowerPC Compiler Writer's Guide
+static __inline fixuint_t __udivXi3(fixuint_t n, fixuint_t d) {
+  const unsigned N = sizeof(fixuint_t) * CHAR_BIT;
+  // d == 0 cases are unspecified.
+  unsigned sr = (d ? clz(d) : N) - (n ? clz(n) : N);
+  // 0 <= sr <= N - 1 or sr is very large.
+  if (sr > N - 1) // n < d
+    return 0;
+  if (sr == N - 1) // d == 1
+    return n;
+  ++sr;
+  // 1 <= sr <= N - 1. Shifts do not trigger UB.
+  fixuint_t r = n >> sr;
+  n <<= N - sr;
+  fixuint_t carry = 0;
+  for (; sr > 0; --sr) {
+    r = (r << 1) | (n >> (N - 1));
+    n = (n << 1) | carry;
+    // Branch-less version of:
+    // carry = 0;
+    // if (r >= d) r -= d, carry = 1;
+    const fixint_t s = (fixint_t)(d - r - 1) >> (N - 1);
+    carry = s & 1;
+    r -= d & s;
+  }
+  n = (n << 1) | carry;
+  return n;
+}
+
+#undef __umodXi3
+#define __umodXi3 __umodXi3_36
+
+// Mostly identical to __udivXi3 but the return values are different.
+static __inline fixuint_t __umodXi3(fixuint_t n, fixuint_t d) {
+  const unsigned N = sizeof(fixuint_t) * CHAR_BIT;
   // d == 0 cases are unspecified.
   unsigned sr = (d ? clz(d) : N) - (n ? clz(n) : N);
   // 0 <= sr <= N - 1 or sr is very large.
@@ -3008,23 +3976,67 @@ COMPILER_RT_ABI du_int __umoddi3(du_int n, du_int d) {
     return 0;
   ++sr;
   // 1 <= sr <= N - 1. Shifts do not trigger UB.
-  du_int r = n >> sr;
+  fixuint_t r = n >> sr;
   n <<= N - sr;
-  du_int carry = 0;
+  fixuint_t carry = 0;
   for (; sr > 0; --sr) {
     r = (r << 1) | (n >> (N - 1));
     n = (n << 1) | carry;
     // Branch-less version of:
     // carry = 0;
     // if (r >= d) r -= d, carry = 1;
-    const di_int s = (di_int)(d - r - 1) >> (N - 1);
+    const fixint_t s = (fixint_t)(d - r - 1) >> (N - 1);
     carry = s & 1;
     r -= d & s;
   }
   return r;
 }
 
+#undef __divXi3
+
+#ifdef COMPUTE_UDIV
+
+#define __divXi3 __divXi3_37
+
+static __inline fixint_t __divXi3(fixint_t a, fixint_t b) {
+  const int N = (int)(sizeof(fixint_t) * CHAR_BIT) - 1;
+  fixint_t s_a = a >> N;                            // s_a = a < 0 ? -1 : 0
+  fixint_t s_b = b >> N;                            // s_b = b < 0 ? -1 : 0
+  fixuint_t a_u = (fixuint_t)(a ^ s_a) + (-s_a);    // negate if s_a == -1
+  fixuint_t b_u = (fixuint_t)(b ^ s_b) + (-s_b);    // negate if s_b == -1
+  s_a ^= s_b;                                       // sign of quotient
+  return (COMPUTE_UDIV(a_u, b_u) ^ s_a) + (-s_a);   // negate if s_a == -1
+}
+#endif // COMPUTE_UDIV
+
+#undef __modXi3
+
+#ifdef ASSIGN_UMOD
+
+#define __modXi3 __modXi3_38
+
+static __inline fixint_t __modXi3(fixint_t a, fixint_t b) {
+  const int N = (int)(sizeof(fixint_t) * CHAR_BIT) - 1;
+  fixint_t s = b >> N;                              // s = b < 0 ? -1 : 0
+  fixuint_t b_u = (fixuint_t)(b ^ s) + (-s);        // negate if s == -1
+  s = a >> N;                                       // s = a < 0 ? -1 : 0
+  fixuint_t a_u = (fixuint_t)(a ^ s) + (-s);        // negate if s == -1
+  fixuint_t res;
+  ASSIGN_UMOD(res, a_u, b_u);
+  return (res ^ s) + (-s);                          // negate if s == -1
+}
+#endif // ASSIGN_UMOD
+
 #undef clz
+
+// Returns: a % b
+
+COMPILER_RT_ABI du_int __umoddi3(du_int a, du_int b) {
+  return __umodXi3(a, b);
+}
+
+#undef fixuint_t
+#undef fixint_t
 //===-- umodsi3.c - Implement __umodsi3 -----------------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -3040,16 +4052,62 @@ COMPILER_RT_ABI du_int __umoddi3(du_int n, du_int d) {
 //===----------------------------------------------------------------------===//
 
 
-// Returns: a % b
+#define fixuint_t su_int
+#define fixint_t si_int
+//===-- int_div_impl.inc - Integer division ---------------------*- C++ -*-===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+// 2024/10/20 - Modified by mintsuki for use inside cc-runtime
+//
+//===----------------------------------------------------------------------===//
+//
+// Helpers used by __udivsi3, __umodsi3, __udivdi3, and __umodsi3.
+//
+//===----------------------------------------------------------------------===//
 
-#ifdef clz
-#undef clz
-#endif
 #define clz(a) (sizeof(a) == sizeof(unsigned long long) ? __builtin_clzll(a) : clzsi(a))
 
-// Mostly identical to __udivsi3 but the return values are different.
-COMPILER_RT_ABI su_int __umodsi3(su_int n, su_int d) {
-  const unsigned N = sizeof(su_int) * CHAR_BIT;
+#undef __udivXi3
+#define __udivXi3 __udivXi3_39
+
+// Adapted from Figure 3-40 of The PowerPC Compiler Writer's Guide
+static __inline fixuint_t __udivXi3(fixuint_t n, fixuint_t d) {
+  const unsigned N = sizeof(fixuint_t) * CHAR_BIT;
+  // d == 0 cases are unspecified.
+  unsigned sr = (d ? clz(d) : N) - (n ? clz(n) : N);
+  // 0 <= sr <= N - 1 or sr is very large.
+  if (sr > N - 1) // n < d
+    return 0;
+  if (sr == N - 1) // d == 1
+    return n;
+  ++sr;
+  // 1 <= sr <= N - 1. Shifts do not trigger UB.
+  fixuint_t r = n >> sr;
+  n <<= N - sr;
+  fixuint_t carry = 0;
+  for (; sr > 0; --sr) {
+    r = (r << 1) | (n >> (N - 1));
+    n = (n << 1) | carry;
+    // Branch-less version of:
+    // carry = 0;
+    // if (r >= d) r -= d, carry = 1;
+    const fixint_t s = (fixint_t)(d - r - 1) >> (N - 1);
+    carry = s & 1;
+    r -= d & s;
+  }
+  n = (n << 1) | carry;
+  return n;
+}
+
+#undef __umodXi3
+#define __umodXi3 __umodXi3_40
+
+// Mostly identical to __udivXi3 but the return values are different.
+static __inline fixuint_t __umodXi3(fixuint_t n, fixuint_t d) {
+  const unsigned N = sizeof(fixuint_t) * CHAR_BIT;
   // d == 0 cases are unspecified.
   unsigned sr = (d ? clz(d) : N) - (n ? clz(n) : N);
   // 0 <= sr <= N - 1 or sr is very large.
@@ -3059,23 +4117,67 @@ COMPILER_RT_ABI su_int __umodsi3(su_int n, su_int d) {
     return 0;
   ++sr;
   // 1 <= sr <= N - 1. Shifts do not trigger UB.
-  su_int r = n >> sr;
+  fixuint_t r = n >> sr;
   n <<= N - sr;
-  su_int carry = 0;
+  fixuint_t carry = 0;
   for (; sr > 0; --sr) {
     r = (r << 1) | (n >> (N - 1));
     n = (n << 1) | carry;
     // Branch-less version of:
     // carry = 0;
     // if (r >= d) r -= d, carry = 1;
-    const si_int s = (si_int)(d - r - 1) >> (N - 1);
+    const fixint_t s = (fixint_t)(d - r - 1) >> (N - 1);
     carry = s & 1;
     r -= d & s;
   }
   return r;
 }
 
+#undef __divXi3
+
+#ifdef COMPUTE_UDIV
+
+#define __divXi3 __divXi3_41
+
+static __inline fixint_t __divXi3(fixint_t a, fixint_t b) {
+  const int N = (int)(sizeof(fixint_t) * CHAR_BIT) - 1;
+  fixint_t s_a = a >> N;                            // s_a = a < 0 ? -1 : 0
+  fixint_t s_b = b >> N;                            // s_b = b < 0 ? -1 : 0
+  fixuint_t a_u = (fixuint_t)(a ^ s_a) + (-s_a);    // negate if s_a == -1
+  fixuint_t b_u = (fixuint_t)(b ^ s_b) + (-s_b);    // negate if s_b == -1
+  s_a ^= s_b;                                       // sign of quotient
+  return (COMPUTE_UDIV(a_u, b_u) ^ s_a) + (-s_a);   // negate if s_a == -1
+}
+#endif // COMPUTE_UDIV
+
+#undef __modXi3
+
+#ifdef ASSIGN_UMOD
+
+#define __modXi3 __modXi3_42
+
+static __inline fixint_t __modXi3(fixint_t a, fixint_t b) {
+  const int N = (int)(sizeof(fixint_t) * CHAR_BIT) - 1;
+  fixint_t s = b >> N;                              // s = b < 0 ? -1 : 0
+  fixuint_t b_u = (fixuint_t)(b ^ s) + (-s);        // negate if s == -1
+  s = a >> N;                                       // s = a < 0 ? -1 : 0
+  fixuint_t a_u = (fixuint_t)(a ^ s) + (-s);        // negate if s == -1
+  fixuint_t res;
+  ASSIGN_UMOD(res, a_u, b_u);
+  return (res ^ s) + (-s);                          // negate if s == -1
+}
+#endif // ASSIGN_UMOD
+
 #undef clz
+
+// Returns: a % b
+
+COMPILER_RT_ABI su_int __umodsi3(su_int a, su_int b) {
+  return __umodXi3(a, b);
+}
+
+#undef fixuint_t
+#undef fixint_t
 //===-- umodti3.c - Implement __umodti3 -----------------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
