@@ -4,8 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
-// 2024/10/20 - Modified by mintsuki for use inside cc-runtime
-//
 //===----------------------------------------------------------------------===//
 //
 // Helpers used by __udivsi3, __umodsi3, __udivdi3, and __umodsi3.
@@ -13,9 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #define clz(a) (sizeof(a) == sizeof(unsigned long long) ? __builtin_clzll(a) : clzsi(a))
-
-#undef __udivXi3
-#define __udivXi3 __udivXi3__EXTERNAL_COUNTER
 
 // Adapted from Figure 3-40 of The PowerPC Compiler Writer's Guide
 static __inline fixuint_t __udivXi3(fixuint_t n, fixuint_t d) {
@@ -46,9 +41,6 @@ static __inline fixuint_t __udivXi3(fixuint_t n, fixuint_t d) {
   return n;
 }
 
-#undef __umodXi3
-#define __umodXi3 __umodXi3__EXTERNAL_COUNTER
-
 // Mostly identical to __udivXi3 but the return values are different.
 static __inline fixuint_t __umodXi3(fixuint_t n, fixuint_t d) {
   const unsigned N = sizeof(fixuint_t) * CHAR_BIT;
@@ -77,12 +69,7 @@ static __inline fixuint_t __umodXi3(fixuint_t n, fixuint_t d) {
   return r;
 }
 
-#undef __divXi3
-
 #ifdef COMPUTE_UDIV
-
-#define __divXi3 __divXi3__EXTERNAL_COUNTER
-
 static __inline fixint_t __divXi3(fixint_t a, fixint_t b) {
   const int N = (int)(sizeof(fixint_t) * CHAR_BIT) - 1;
   fixint_t s_a = a >> N;                            // s_a = a < 0 ? -1 : 0
@@ -94,12 +81,7 @@ static __inline fixint_t __divXi3(fixint_t a, fixint_t b) {
 }
 #endif // COMPUTE_UDIV
 
-#undef __modXi3
-
 #ifdef ASSIGN_UMOD
-
-#define __modXi3 __modXi3__EXTERNAL_COUNTER
-
 static __inline fixint_t __modXi3(fixint_t a, fixint_t b) {
   const int N = (int)(sizeof(fixint_t) * CHAR_BIT) - 1;
   fixint_t s = b >> N;                              // s = b < 0 ? -1 : 0
@@ -111,5 +93,3 @@ static __inline fixint_t __modXi3(fixint_t a, fixint_t b) {
   return (res ^ s) + (-s);                          // negate if s == -1
 }
 #endif // ASSIGN_UMOD
-
-#undef clz

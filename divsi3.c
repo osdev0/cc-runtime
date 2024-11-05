@@ -4,8 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
-// 2024/08/10 - Modified by mintsuki for use inside cc-runtime
-//
 //===----------------------------------------------------------------------===//
 //
 // This file implements __divsi3 for the compiler_rt library.
@@ -30,7 +28,3 @@ COMPILER_RT_ABI si_int __divsi3(si_int a, si_int b) { return __divXi3(a, b); }
 #if defined(__ARM_EABI__)
 COMPILER_RT_ALIAS(__divsi3, __aeabi_idiv)
 #endif
-
-#undef fixint_t
-#undef fixuint_t
-#undef COMPUTE_UDIV

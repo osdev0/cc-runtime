@@ -1,2 +1,3 @@
-/cc-runtime.c
-/cc-runtime.o
+*.d
+*.o
+*.a

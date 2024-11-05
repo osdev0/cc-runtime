@@ -4,8 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
-// 2024/08/10 - Modified by mintsuki for use inside cc-runtime
-//
 //===----------------------------------------------------------------------===//
 //
 // This file implements __muloti4 for the compiler_rt library.
@@ -27,8 +25,5 @@
 COMPILER_RT_ABI ti_int __muloti4(ti_int a, ti_int b, int *overflow) {
   return __muloXi4(a, b, overflow);
 }
-
-#undef fixint_t
-#undef fixuint_t
 
 #endif // CRT_HAS_128BIT

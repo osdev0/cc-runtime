@@ -4,8 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
-// 2024/08/10 - Modified by mintsuki for use inside cc-runtime
-//
 //===----------------------------------------------------------------------===//
 //
 // This file implements __udivdi3 for the compiler_rt library.
@@ -14,8 +12,8 @@
 
 #include "int_lib.h"
 
-#define fixuint_t du_int
-#define fixint_t di_int
+typedef du_int fixuint_t;
+typedef di_int fixint_t;
 #include "int_div_impl.inc"
 
 // Returns: a / b
@@ -23,6 +21,3 @@
 COMPILER_RT_ABI du_int __udivdi3(du_int a, du_int b) {
   return __udivXi3(a, b);
 }
-
-#undef fixuint_t
-#undef fixint_t

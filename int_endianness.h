@@ -4,8 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
-// 2024/01/21 - Modified by mintsuki for use inside cc-runtime
-//
 //===----------------------------------------------------------------------===//
 //
 // This file is a configuration header for compiler-rt.

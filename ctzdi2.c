@@ -4,8 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
-// 2024/08/10 - Modified by mintsuki for use inside cc-runtime
-//
 //===----------------------------------------------------------------------===//
 //
 // This file implements __ctzdi2 for the compiler_rt library.
@@ -35,7 +33,3 @@ COMPILER_RT_ABI int __ctzdi2(di_int a) {
   return ctzsi((x.s.high & f) | (x.s.low & ~f)) +
          (f & ((si_int)(sizeof(si_int) * CHAR_BIT)));
 }
-
-#ifdef __builtin_ctz
-#undef __builtin_ctz
-#endif

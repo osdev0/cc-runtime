@@ -4,8 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
-// 2024/01/21 - Modified by mintsuki for use inside cc-runtime
-//
 //===----------------------------------------------------------------------===//
 //
 // This file defines macros for use in compiler-rt assembler source.
@@ -18,6 +16,8 @@
 
 #define SEPARATOR ;
 
+#if defined(__ELF__)
+
 #define HIDDEN(name) .hidden name
 #define LOCAL_LABEL(name) .L_##name
 #define FILE_LEVEL_DIRECTIVE
@@ -29,6 +29,22 @@
 #define CONST_SECTION .section .rodata
 
 #define NO_EXEC_STACK_DIRECTIVE .section .note.GNU-stack,"",%progbits
+
+#else // !__ELF__
+
+#define HIDDEN(name)
+#define LOCAL_LABEL(name) .L ## name
+#define FILE_LEVEL_DIRECTIVE
+#define SYMBOL_IS_FUNC(name)                                                   \
+  .def name SEPARATOR                                                          \
+    .scl 2 SEPARATOR                                                           \
+    .type 32 SEPARATOR                                                         \
+  .endef
+#define CONST_SECTION .section .rdata,"rd"
+
+#define NO_EXEC_STACK_DIRECTIVE
+
+#endif
 
 #if defined(__arm__) || defined(__aarch64__)
 #define FUNC_ALIGN                                                             \
@@ -166,9 +182,7 @@
 #define GLUE4_(a, b, c, d) a##b##c##d
 #define GLUE4(a, b, c, d) GLUE4_(a, b, c, d)
 
-#ifndef SYMBOL_NAME
 #define SYMBOL_NAME(name) GLUE(__USER_LABEL_PREFIX__, name)
-#endif
 
 #ifdef VISIBILITY_HIDDEN
 #define DECLARE_SYMBOL_VISIBILITY(name)                                        \
@@ -239,10 +253,16 @@
 #define DEFINE_AEABI_FUNCTION_ALIAS(aeabi_name, name)
 #endif
 
+#ifdef __ELF__
 #define END_COMPILERRT_FUNCTION(name)                                          \
   .size SYMBOL_NAME(name), . - SYMBOL_NAME(name)
 #define END_COMPILERRT_OUTLINE_FUNCTION(name)                                  \
   CFI_END SEPARATOR                                                            \
   .size SYMBOL_NAME(name), . - SYMBOL_NAME(name)
+#else
+#define END_COMPILERRT_FUNCTION(name)
+#define END_COMPILERRT_OUTLINE_FUNCTION(name)                                  \
+  CFI_END
+#endif
 
 #endif // COMPILERRT_ASSEMBLY_H

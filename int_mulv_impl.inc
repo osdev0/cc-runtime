@@ -4,8 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
-// 2024/10/20 - Modified by mintsuki for use inside cc-runtime
-//
 //===----------------------------------------------------------------------===//
 //
 // Helper used by __mulvsi3, __mulvdi3 and __mulvti3.
@@ -17,9 +15,6 @@
 // Returns: a * b
 
 // Effects: aborts if a * b overflows
-
-#undef __mulvXi3
-#define __mulvXi3 __mulvXi3__EXTERNAL_COUNTER
 
 static __inline fixint_t __mulvXi3(fixint_t a, fixint_t b) {
   const int N = (int)(sizeof(fixint_t) * CHAR_BIT);
