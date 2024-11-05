@@ -14,6 +14,8 @@
 
 #include "int_lib.h"
 
+#if HAS_80_BIT_LONG_DOUBLE == 1
+
 #ifdef CRT_HAS_128BIT
 
 // Returns: convert a to a unsigned long long, rounding toward zero.
@@ -44,5 +46,7 @@ COMPILER_RT_ABI tu_int __fixunsxfti(xf_float a) {
 }
 
 #endif // CRT_HAS_128BIT
+
+#endif
 
 #endif

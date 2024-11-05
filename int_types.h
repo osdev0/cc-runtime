@@ -154,7 +154,7 @@ typedef struct {
 // be compatible with. On 32-bit x86 Android, long double is 64 bits, while on
 // x86_64 Android, long double is 128 bits.
 #if (defined(__i386__) || defined(__x86_64__)) &&                              \
-    !(defined(_MSC_VER) || defined(__ANDROID__))
+    !(defined(_MSC_VER))
 #define HAS_80_BIT_LONG_DOUBLE 1
 #elif defined(__m68k__) || defined(__ia64__)
 #define HAS_80_BIT_LONG_DOUBLE 1

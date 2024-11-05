@@ -8,10 +8,14 @@
 
 #ifndef CC_RUNTIME_NO_FLOAT
 
+#ifndef __loongarch64
+
 #define SRC_DOUBLE
 #define DST_BFLOAT
 #include "fp_trunc_impl.inc"
 
 COMPILER_RT_ABI dst_t __truncdfbf2(double a) { return __truncXfYf2__(a); }
+
+#endif
 
 #endif
