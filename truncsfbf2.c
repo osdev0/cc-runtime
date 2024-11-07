@@ -8,7 +8,7 @@
 
 #ifndef CC_RUNTIME_NO_FLOAT
 
-#ifndef __loongarch64
+#if defined(__i386__) || defined(__x86_64__) || defined(__aarch64__) || defined(__riscv)
 
 #define SRC_SINGLE
 #define DST_BFLOAT

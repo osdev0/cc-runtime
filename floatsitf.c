@@ -17,6 +17,8 @@
 #define QUAD_PRECISION
 #include "fp_lib.h"
 
+#if defined(CRT_HAS_IEEE_TF)
+
 #if defined(CRT_HAS_TF_MODE)
 COMPILER_RT_ABI fp_t __floatsitf(si_int a) {
 
@@ -47,6 +49,8 @@ COMPILER_RT_ABI fp_t __floatsitf(si_int a) {
   // Insert the sign bit and return
   return fromRep(result | sign);
 }
+
+#endif
 
 #endif
 

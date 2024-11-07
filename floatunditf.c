@@ -17,6 +17,8 @@
 #define QUAD_PRECISION
 #include "fp_lib.h"
 
+#if defined(CRT_HAS_IEEE_TF)
+
 #if defined(CRT_HAS_TF_MODE)
 COMPILER_RT_ABI fp_t __floatunditf(du_int a) {
 
@@ -38,6 +40,8 @@ COMPILER_RT_ABI fp_t __floatunditf(du_int a) {
   result += (rep_t)(exponent + exponentBias) << significandBits;
   return fromRep(result);
 }
+
+#endif
 
 #endif
 
