@@ -1,25 +1,23 @@
 MAKEFLAGS += -rR
 .SUFFIXES:
 
-override USER_VARIABLE = $(if $(filter $(origin $(1)),default undefined),$(eval override $(1) := $(2)))
+CC := cc
+AR := ar
 
-$(call USER_VARIABLE,CC,cc)
-
-$(call USER_VARIABLE,AR,ar)
-
-$(call USER_VARIABLE,CFLAGS,-g -O2 -pipe)
-$(call USER_VARIABLE,CPPFLAGS,)
+CFLAGS := -g -O2 -pipe
+CPPFLAGS :=
 
 override CFLAGS += \
     -Wall \
     -Wextra \
-    -std=gnu11 \
+    -std=c11 \
     -ffreestanding \
     -fno-stack-protector \
     -fno-stack-check \
     -fno-lto \
     -ffunction-sections \
-    -fdata-sections
+    -fdata-sections \
+    -fvisibility=hidden
 
 override CPPFLAGS := \
     $(CPPFLAGS) \
