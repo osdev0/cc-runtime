@@ -1,8 +1,8 @@
 MAKEFLAGS += -rR
 .SUFFIXES:
 
-CC := cc
-AR := ar
+CC ?= cc
+AR ?= ar
 
 CFLAGS := -g -O2 -pipe
 CPPFLAGS :=
