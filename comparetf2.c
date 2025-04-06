@@ -41,8 +41,6 @@
 #define QUAD_PRECISION
 #include "fp_lib.h"
 
-#if defined(CRT_HAS_IEEE_TF)
-
 #if defined(CRT_HAS_TF_MODE)
 #include "fp_compare_impl.inc"
 
@@ -63,8 +61,6 @@ COMPILER_RT_ALIAS(__getf2, __gttf2)
 COMPILER_RT_ABI CMP_RESULT __unordtf2(fp_t a, fp_t b) {
   return __unordXf2__(a, b);
 }
-
-#endif
 
 #endif
 

@@ -16,8 +16,6 @@
 #define QUAD_PRECISION
 #include "fp_lib.h"
 
-#if defined(CRT_HAS_IEEE_TF)
-
 #if defined(CRT_HAS_TF_MODE)
 
 #define NUMBER_OF_HALF_ITERATIONS 4
@@ -26,8 +24,6 @@
 #include "fp_div_impl.inc"
 
 COMPILER_RT_ABI fp_t __divtf3(fp_t a, fp_t b) { return __divXf3__(a, b); }
-
-#endif
 
 #endif
 
