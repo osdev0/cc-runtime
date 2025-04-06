@@ -40,5 +40,5 @@ jobs:
           rm -rf .github *.c *.h *.inc
           mv /tmp/cc-runtime.c ./
           git add -f .
-          git commit -m "Push packed cc-runtime.c"
+          git commit --allow-empty -m "Push packed cc-runtime.c"
           git push origin packed
