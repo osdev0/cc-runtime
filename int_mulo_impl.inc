@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
+// 2024/10/20 - Modified by mintsuki for use inside cc-runtime
+//
 //===----------------------------------------------------------------------===//
 //
 // Helper used by __mulosi4, __mulodi4 and __muloti4.
@@ -15,6 +17,9 @@
 // Returns: a * b
 
 // Effects: sets *overflow to 1  if a * b overflows
+
+#undef __muloXi4
+#define __muloXi4 __muloXi4__EXTERNAL_COUNTER
 
 static __inline fixint_t __muloXi4(fixint_t a, fixint_t b, int *overflow) {
   const int N = (int)(sizeof(fixint_t) * CHAR_BIT);

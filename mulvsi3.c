@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
+// 2024/08/10 - Modified by mintsuki for use inside cc-runtime
+//
 //===----------------------------------------------------------------------===//
 //
 // This file implements __mulvsi3 for the compiler_rt library.
@@ -19,3 +21,6 @@
 // Effects: aborts if a * b overflows
 
 COMPILER_RT_ABI si_int __mulvsi3(si_int a, si_int b) { return __mulvXi3(a, b); }
+
+#undef fixint_t
+#undef fixuint_t

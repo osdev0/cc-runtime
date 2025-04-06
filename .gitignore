@@ -1,3 +1,2 @@
-*.d
-*.o
-*.a
+/cc-runtime.c
+/cc-runtime.o

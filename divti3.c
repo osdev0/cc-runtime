@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
+// 2024/08/10 - Modified by mintsuki for use inside cc-runtime
+//
 //===----------------------------------------------------------------------===//
 //
 // This file implements __divti3 for the compiler_rt library.
@@ -22,5 +24,9 @@
 #include "int_div_impl.inc"
 
 COMPILER_RT_ABI ti_int __divti3(ti_int a, ti_int b) { return __divXi3(a, b); }
+
+#undef fixint_t
+#undef fixuint_t
+#undef COMPUTE_UDIV
 
 #endif // CRT_HAS_128BIT
