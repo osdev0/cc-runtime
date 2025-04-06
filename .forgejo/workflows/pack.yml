@@ -1,0 +1,44 @@
+name: Pack cc-runtime
+
+on: [push]
+
+jobs:
+  pack:
+    name: Pack cc-runtime
+    runs-on: codeberg-tiny
+    container: archlinux:latest
+
+    steps:
+      - name: Create resolv.conf
+        run: |
+          set -ex
+          echo 'nameserver 8.8.8.8' >/etc/resolv.conf
+          echo 'nameserver 8.8.4.4' >>/etc/resolv.conf
+
+      - name: Install dependencies
+        run: pacman --noconfirm -Syu && pacman --noconfirm -S nodejs git
+
+      - name: Checkout code
+        uses: https://code.forgejo.org/actions/checkout@v4
+        with:
+          fetch-depth: '0'
+
+      - name: Pack cc-runtime
+        run: |
+          set -ex
+          ./pack.sh
+          mv cc-runtime.c /tmp/
+
+      - name: Push packed cc-runtime
+        run: |
+          set -ex
+          git config user.name 'Mintsuki'
+          git config user.email 'mintsuki@protonmail.com'
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@codeberg.org/osdev/cc-runtime.git
+          git fetch --all
+          git checkout packed || git checkout --orphan packed
+          rm -rf .github *.c *.h *.inc
+          mv /tmp/cc-runtime.c ./
+          git add -f .
+          git commit -m "Push packed cc-runtime.c"
+          git push origin packed
