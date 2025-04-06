@@ -14,8 +14,6 @@
 
 #include "int_lib.h"
 
-#if HAS_80_BIT_LONG_DOUBLE == 1
-
 #ifdef CRT_HAS_128BIT
 
 // Returns: convert a to a long double, rounding toward even.
@@ -75,7 +73,5 @@ COMPILER_RT_ABI xf_float __floattixf(ti_int a) {
 }
 
 #endif // CRT_HAS_128BIT
-
-#endif
 
 #endif
