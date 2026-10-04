@@ -24,3 +24,15 @@ rm -f saved-includes
 
 awk '{for(x=1;x<=NF;x++)if($x~/_EXTERNAL_COUNTER/){sub(/_EXTERNAL_COUNTER/,++i)}}1' src/cc-runtime.c > src/cc-runtime.c.tmp
 mv src/cc-runtime.c.tmp src/cc-runtime.c
+
+sed -e 's|^|// |' -e 's| *$||' LICENSE.TXT > license-header
+echo '//' >> license-header
+echo '// ---- Start of embedded CREDITS.TXT, as referred to above ----' >> license-header
+echo '//' >> license-header
+sed -e 's|^|// |' -e 's| *$||' CREDITS.TXT >> license-header
+echo '//' >> license-header
+echo '// ---- End of embedded CREDITS.TXT ----' >> license-header
+echo >> license-header
+cat license-header src/cc-runtime.c > src/cc-runtime.c.tmp
+mv src/cc-runtime.c.tmp src/cc-runtime.c
+rm -f license-header
