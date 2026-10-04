@@ -1,0 +1,42 @@
+name: Pack cc-runtime
+
+on:
+  push:
+    branches:
+      - trunk
+
+permissions:
+  contents: write
+
+jobs:
+  pack:
+    name: Pack cc-runtime
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: '0'
+
+      - name: Pack cc-runtime
+        run: |
+          set -ex
+          ./pack.sh
+          mkdir -p /tmp/packed/src
+          mv src/cc-runtime.c /tmp/packed/src/
+          cp CREDITS.TXT LICENSE.TXT README /tmp/packed/
+
+      - name: Push packed cc-runtime
+        run: |
+          set -ex
+          git config user.name 'Mintsuki'
+          git config user.email 'mintsuki@protonmail.com'
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/osdev0/cc-runtime.git
+          git fetch --all
+          git checkout packed || git checkout --orphan packed
+          git rm -rfq .
+          cp -R /tmp/packed/. ./
+          git add -f .
+          git commit --allow-empty -m "Push packed cc-runtime.c"
+          git push origin packed
